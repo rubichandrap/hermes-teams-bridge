@@ -121,13 +121,14 @@ export function stopProxyServer(): void {
  */
 export function checkProxyAuth(
 	authHeader: string | undefined,
-	token: string,
+	expected: string,
 ): boolean {
 	if (!authHeader) return false;
-	const value = authHeader.startsWith("Bearer ")
-		? authHeader.slice("Bearer ".length)
-		: authHeader;
-	return value.trim() === token;
+	const trimmed = authHeader.trim();
+	const value = trimmed.startsWith("Bearer ")
+		? trimmed.slice("Bearer ".length)
+		: trimmed;
+	return value.trim() === expected;
 }
 
 function enrichTeamsMessage(

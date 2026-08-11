@@ -9,6 +9,9 @@ describe("loadConfig", () => {
 	beforeEach(() => {
 		vi.resetModules();
 		process.env = { ...origEnv };
+		// Hermetic against whatever is in the repo's .env: agent-specific
+		// overrides always win over the general key.
+		process.env.TEAMS_BRIDGE_FLOW2_URL_MAIN = "https://example.com/flow2-main";
 	});
 
 	afterEach(() => {
@@ -27,7 +30,7 @@ describe("loadConfig", () => {
 		expect(config.hermesBin).toBe("hermes");
 		expect(config.sessionPollMs).toBeGreaterThan(0);
 		expect(config.dbPath).toContain("state.db");
-		expect(config.agents.main?.flow2Url).toBe("https://example.com/flow2");
+		expect(config.agents.main?.flow2Url).toBe("https://example.com/flow2-main");
 	});
 
 	it("uses agent specific env var over general flow2Url", () => {
