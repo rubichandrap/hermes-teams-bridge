@@ -48,8 +48,10 @@ src/index.ts                    Bootstrap
             ├─ src/context/md-writer.ts   Conversation Markdown for AI context
             └─ src/security/index.ts      Strategy-pattern security scanner
        ├─ src/watcher/db-watcher.ts       Polls state.db for [TEAMS_META] session activity
-       ├─ src/agent/runner.ts             Spawns `hermes chat -q -Q --source teams-bridge`
-       └─ src/proxy/server.ts            HTTP proxy (port 18790) — context enrichment
+       ├─ src/agent/runner.ts             Spawns `hermes chat -q -Q --source teams-bridge` (bootstrap/resume by session id)
+       ├─ src/dispatcher/turn-dispatcher.ts  Per-conversation turn queue: bootstrap/resume, session registry, /reset
+       ├─ src/registry/session-registry.ts   Persistent conversation→session mapping (registry.json)
+       └─ src/proxy/server.ts            HTTP proxy (port 18790) — dispatches inbound Teams messages to the turn dispatcher
 ```
 
 - **Zero runtime dependencies** — Node.js built-ins only (`fs`, `path`, `http`, `sqlite`)
@@ -81,8 +83,10 @@ src/index.ts                    Bootstrap
 | `src/core/bridge.ts` | Orchestrator: db watcher, heartbeat, proxy, signal handlers |
 | `src/core/session-lifecycle.ts` | Core logic: parse sessions, run security, forward responses, retry |
 | `src/store/hermes-store.ts` | Read-only SQLite adapter: row → `SessionEntry` mapping, `[TEAMS_META]` discovery |
-| `src/agent/runner.ts` | Spawns `hermes chat -q -Q --source teams-bridge` per inbound message |
-| `src/proxy/server.ts` | HTTP proxy (port 18790) — enriches Teams messages with condensed instructions + conversation context; optional bearer-token auth (`TEAMS_BRIDGE_PROXY_TOKEN`) |
+| `src/agent/runner.ts` | Spawns `hermes chat -q -Q --source teams-bridge` per inbound message (bootstrap, or `-r <sessionId>` resume); captures `session_id` from stderr; best-effort `hermes sessions rename` to `teams:<conversation>` |
+| `src/dispatcher/turn-dispatcher.ts` | Per-conversation turn queue (one in-flight turn per conversation); bootstraps/resumes registry sessions; /reset severs the binding; watcher-association fallback for failed id capture |
+| `src/registry/session-registry.ts` | Persistent conversation→session mapping in `registry.json` (write-through, atomic); pending-bootstrap markers + severed tombstones |
+| `src/proxy/server.ts` | HTTP proxy (port 18790) — dispatches inbound Teams messages to the turn dispatcher; optional bearer-token auth (`TEAMS_BRIDGE_PROXY_TOKEN`) |
 | `src/forwarder/flow2.ts` | POSTs AI responses to Power Automate Flow 2 (100s timeout) |
 | `src/session/parser.ts` | Parses `[TEAMS_META]` blocks (full `[...]...[/...]` match only — bare mentions ignored), extracts assistant text, strips HTML |
 | `src/watcher/db-watcher.ts` | Polls the session store (default 2000ms) for changed sessions carrying Teams metadata |
@@ -96,7 +100,7 @@ src/index.ts                    Bootstrap
 
 ## Config
 
-- `config.json` — behavioral tuning (non-sensitive): `proxyMode`, `proxyPort`, `responseTimeoutSeconds`, `responseSettleMs`, `sessionPollMs`, `hermesBin`, per-agent `signature`/`profile`/`extraArgs`
+- `config.json` — behavioral tuning (non-sensitive): `proxyMode`, `proxyPort`, `responseTimeoutSeconds`, `responseSettleMs`, `sessionPollMs`, `hermesBin`, `resetCommands` (default `["/reset"]`), per-agent `signature`/`profile`/`extraArgs`
 - `.env` — secrets + deployment (`TEAMS_BRIDGE_*` prefix, e.g. `TEAMS_BRIDGE_FLOW2_URL_MAIN`), copy from `.env.example`
 - `state.json` — runtime state: `forwarded`, `retries` (max 3), `failed` (audit log, mirrored in `failed.json`)
 - `dbPath` resolves to `$HERMES_HOME/state.db` (default `~/.hermes/state.db`); override with `TEAMS_BRIDGE_DB_PATH`

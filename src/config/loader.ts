@@ -24,6 +24,7 @@ const DEFAULT_CONFIG: Partial<BridgeConfig> = {
 	hermesBin: "hermes",
 	dbPath: "",
 	sessionPollMs: 2000,
+	resetCommands: ["/reset"],
 	agents: {},
 };
 
@@ -183,6 +184,14 @@ function validateConfig(config: BridgeConfig): void {
 
 	if (!config.dbPath) {
 		fatal("dbPath not set (Hermes session store)");
+		process.exit(1);
+	}
+
+	if (
+		!Array.isArray(config.resetCommands) ||
+		config.resetCommands.some((cmd) => typeof cmd !== "string" || !cmd.trim())
+	) {
+		fatal("resetCommands must be an array of non-empty strings");
 		process.exit(1);
 	}
 }

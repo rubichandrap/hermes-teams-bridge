@@ -12,6 +12,7 @@ dist/
 contexts/
 state.json*
 failed.json
+registry.json
 
 # Logs
 *.log

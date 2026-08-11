@@ -1,5 +1,9 @@
+import path from "node:path";
 import { cleanupOldContexts, ensureDirectory } from "../context/manager";
+import { TurnDispatcher } from "../dispatcher/turn-dispatcher";
 import { startProxyServer, stopProxyServer } from "../proxy/server";
+import { SessionRegistry } from "../registry/session-registry";
+import { extractTeamsMetadata } from "../session/parser";
 import { flushState, loadState } from "../state/manager";
 import type { SessionStore } from "../store/hermes-store";
 import type { BridgeConfig } from "../types";
@@ -14,6 +18,8 @@ export class BridgeOrchestrator {
 	private readonly config: BridgeConfig;
 	private readonly store: SessionStore;
 	private readonly sessionLifecycle: SessionLifecycle;
+	private readonly registry: SessionRegistry;
+	private readonly dispatcher: TurnDispatcher;
 	private shutdown = false;
 	private timers: NodeJS.Timeout[] = [];
 	private watchers: ReturnType<typeof createDbWatcher>[] = [];
@@ -22,11 +28,16 @@ export class BridgeOrchestrator {
 		this.config = config;
 		this.store = store;
 		this.sessionLifecycle = new SessionLifecycle(config, store);
+		this.registry = new SessionRegistry(
+			path.join(process.cwd(), "registry.json"),
+		);
+		this.dispatcher = new TurnDispatcher(config, this.registry);
 	}
 
 	async start(): Promise<void> {
 		ensureDirectory();
 		loadState();
+		this.registry.load();
 		cleanupOldContexts(this.config.contextMaxAgeDays);
 
 		info(
@@ -34,7 +45,7 @@ export class BridgeOrchestrator {
 		);
 
 		if (this.config.proxyMode) {
-			startProxyServer(this.config);
+			startProxyServer(this.config, this.dispatcher);
 		}
 
 		this.startWatchers();
@@ -57,6 +68,11 @@ export class BridgeOrchestrator {
 							);
 							return null;
 						}
+						this.dispatcher.associateIfPending(
+							agentId,
+							ref.sessionId,
+							this.conversationIdFor(ref.sessionId),
+						);
 						return { agentId, sessionId: ref.sessionId };
 					})
 					.filter(
@@ -81,6 +97,11 @@ export class BridgeOrchestrator {
 			for (const ref of refs) {
 				const agentId = this.agentIdForProfile(ref.profileName);
 				if (!agentId) continue;
+				this.dispatcher.associateIfPending(
+					agentId,
+					ref.sessionId,
+					this.conversationIdFor(ref.sessionId),
+				);
 				tagged.push({ agentId, sessionId: ref.sessionId });
 			}
 			if (tagged.length > 0) {
@@ -105,6 +126,13 @@ export class BridgeOrchestrator {
 		return undefined;
 	}
 
+	private conversationIdFor(sessionId: string): string | undefined {
+		const entries = this.store.readSessionEntries(sessionId);
+		if (!entries) return undefined;
+		const meta = extractTeamsMetadata(entries);
+		return meta.conversationId;
+	}
+
 	private setupSignalHandlers(): void {
 		const gracefulShutdown = () => {
 			if (this.shutdown) return;
@@ -114,10 +142,12 @@ export class BridgeOrchestrator {
 			for (const watcher of this.watchers) watcher.stop();
 			for (const timer of this.timers) clearInterval(timer);
 
+			this.dispatcher.stop();
 			stopProxyServer();
-			void this.sessionLifecycle.stop().then(() => {
+			void this.sessionLifecycle.stop().then(async () => {
 				this.store.close();
 				flushState();
+				await this.registry.flushAndWait();
 				info("Shutdown complete");
 				process.exit(0);
 			});

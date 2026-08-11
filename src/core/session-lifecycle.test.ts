@@ -148,6 +148,7 @@ function makeConfig(tmpDir: string): BridgeConfig {
 		hermesBin: "hermes",
 		dbPath: path.join(tmpDir, "state.db"),
 		sessionPollMs: 2000,
+		resetCommands: ["/reset"],
 		agents: {
 			main: {
 				flow2Url: "https://example.com/flow2",

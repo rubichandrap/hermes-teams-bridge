@@ -12,6 +12,7 @@
   "responseSettleMs": 5000,
   "timeoutFallbackMessage": "⏱️ AI is still processing and exceeded the {seconds} second time limit. Please resend your question...",
   "sessionPollMs": 2000,
+  "resetCommands": ["/reset"],
   "agents": {
     "main": {
       "signature": "[🤖 Rubot]",

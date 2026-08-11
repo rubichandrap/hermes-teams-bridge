@@ -1,21 +1,18 @@
 import http from "node:http";
-import { spawnAgentTurn } from "../agent/runner";
-import { loadContext } from "../context/manager";
-import { buildContextReference } from "../context/md-writer";
-import {
-	INJECTION_MARKER_INSTRUCTION,
-	buildInjectedContext,
-	parseTeamsMetadataFromText,
-} from "../session/parser";
+import type { DispatchService } from "../dispatcher/turn-dispatcher";
+import { parseTeamsMetadataFromText } from "../session/parser";
 import type { BridgeConfig } from "../types";
 import { debug, error, info } from "../utils/logger";
 
 let proxyServer: http.Server | null = null;
 
-export function startProxyServer(config: BridgeConfig): void {
+export function startProxyServer(
+	config: BridgeConfig,
+	dispatcher: DispatchService,
+): http.Server | null {
 	if (!config.proxyMode) {
 		info("Proxy mode: DISABLED (direct mode)");
-		return;
+		return null;
 	}
 
 	proxyServer = http.createServer(async (req, res) => {
@@ -64,38 +61,46 @@ export function startProxyServer(config: BridgeConfig): void {
 					return;
 				}
 
-				if (!String(payload.message ?? "").trim()) {
+				const message = String(payload.message ?? "");
+				if (!message.trim()) {
 					res.writeHead(400, { "Content-Type": "application/json" });
 					res.end(JSON.stringify({ error: "Empty message" }));
 					return;
 				}
 
-				const enrichedPayload = enrichTeamsMessage(payload, config);
-
-				if (enrichedPayload.message !== payload.message) {
-					const meta = parseTeamsMetadataFromText(
-						String(payload.message ?? ""),
+				const meta = parseTeamsMetadataFromText(message);
+				if (!meta?.conversationId) {
+					res.writeHead(400, { "Content-Type": "application/json" });
+					res.end(
+						JSON.stringify({
+							error: "Missing conversationId in TEAMS_META",
+						}),
 					);
-					info(
-						`Proxy: Injected history for ${meta?.conversationId ?? "unknown"}`,
-					);
+					return;
 				}
 
-				const spawn = await spawnAgentTurn(
-					config,
-					agent,
-					String(enrichedPayload.message ?? ""),
+				const result = await dispatcher.dispatch(
+					agentId,
+					meta.conversationId,
+					message,
 				);
-				if (!spawn.ok) {
+				if (!result.ok) {
 					res.writeHead(502, { "Content-Type": "application/json" });
-					res.end(JSON.stringify({ error: spawn.error ?? "spawn failed" }));
+					res.end(JSON.stringify({ error: result.error ?? "spawn failed" }));
 					return;
 				}
 
 				res.writeHead(200, { "Content-Type": "application/json" });
-				res.end(JSON.stringify({ status: "queued", agentId }));
+				res.end(
+					JSON.stringify({
+						status: result.reset ? "reset" : "queued",
+						agentId,
+					}),
+				);
 
-				info(`Proxy: Agent turn queued for ${agentId}`);
+				info(
+					`Proxy: ${result.reset ? "Reset" : "Agent turn queued"} for ${agentId} (${meta.conversationId})`,
+				);
 			} catch (err) {
 				error(`Proxy: Failed to process request: ${(err as Error).message}`);
 				res.writeHead(500, { "Content-Type": "application/json" });
@@ -111,6 +116,8 @@ export function startProxyServer(config: BridgeConfig): void {
 	proxyServer.on("error", (err) => {
 		error(`Proxy server error: ${err.message}`);
 	});
+
+	return proxyServer;
 }
 
 export function stopProxyServer(): void {
@@ -135,32 +142,4 @@ export function checkProxyAuth(
 		? trimmed.slice("Bearer ".length)
 		: trimmed;
 	return value.trim() === expected;
-}
-
-function enrichTeamsMessage(
-	body: Record<string, unknown>,
-	_config: BridgeConfig,
-): Record<string, unknown> {
-	const message = String(body.message ?? "");
-	const meta = parseTeamsMetadataFromText(message);
-
-	if (!meta?.conversationId) {
-		return body;
-	}
-
-	const contextData = loadContext(meta.conversationId);
-	const contextRef = buildContextReference(
-		meta.conversationId,
-		contextData?.messages ?? [],
-	);
-	if (!contextRef) {
-		return body;
-	}
-
-	const instruction = `${INJECTION_MARKER_INSTRUCTION} Reply with ONE final message. No narration, no planning, no NO_REPLY for questions.`;
-
-	const enrichedMessage =
-		buildInjectedContext(contextRef, instruction) + "\n\n" + message;
-
-	return { ...body, message: enrichedMessage };
 }

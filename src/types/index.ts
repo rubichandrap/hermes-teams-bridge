@@ -49,6 +49,11 @@ export interface BridgeConfig {
 	 * Strongly recommended when the proxy is exposed via a public tunnel.
 	 */
 	proxyToken?: string;
+	/**
+	 * Messages that exactly match one of these (after cleaning) sever the
+	 * conversation's session binding; the next turn bootstraps a fresh session.
+	 */
+	resetCommands: string[];
 	agents: Record<string, AgentConfig>;
 }
 
