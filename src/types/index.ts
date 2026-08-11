@@ -43,6 +43,12 @@ export interface BridgeConfig {
 	dbPath: string;
 	/** Session store polling interval in ms. */
 	sessionPollMs: number;
+	/**
+	 * Optional bearer token for the /teams-proxy endpoint. When set, inbound
+	 * requests must carry `Authorization: Bearer <token>` (or the bare token).
+	 * Strongly recommended when the proxy is exposed via a public tunnel.
+	 */
+	proxyToken?: string;
 	agents: Record<string, AgentConfig>;
 }
 

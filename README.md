@@ -12,6 +12,7 @@ A port of [openclaw-teams-bridge](https://github.com/rubichandrap/openclaw-teams
 - **Timeout fallback** — if the agent hasn't answered after `responseTimeoutSeconds`, Teams gets a "still processing" notice (the real answer still arrives when ready)
 - **Security scanner** — blocks dangerous commands, file writes, and identity-file tampering from Teams chat, replying with a warning instead
 - **Multi-agent** — each configured agent maps to a Hermes profile (`main`, `stevbot`, …), with per-agent signatures and Flow 2 URLs
+- **Authenticated proxy** — optional bearer token on the inbound endpoint (required when tunneled publicly)
 - **Zero runtime dependencies** — Node built-ins only (including `node:sqlite`)
 
 ## How It Works
@@ -85,6 +86,7 @@ npm run logs                 # pm2 logs hermes-teams-bridge
     "message": "[TEAMS_META]\nconversationId: {conversationId}\nteamsMessageId: {teamsMessageId}\nsenderName: {senderName}\nsenderUserId: {senderUserId}\nreplyToId: {replyToId}\n[/TEAMS_META]\n\n{message text}"
   }
   ```
+  If `TEAMS_BRIDGE_PROXY_TOKEN` is set (recommended), the HTTP action must also send header `Authorization: Bearer <token>` — the proxy answers 401 without it.
 - **Flow 2 (outbound):** HTTP trigger. The bridge POSTs:
   ```json
   {

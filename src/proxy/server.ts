@@ -25,6 +25,16 @@ export function startProxyServer(config: BridgeConfig): void {
 			return;
 		}
 
+		if (config.proxyToken) {
+			const authHeader = req.headers.authorization;
+			const auth = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+			if (!checkProxyAuth(auth, config.proxyToken)) {
+				res.writeHead(401, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: "Unauthorized" }));
+				return;
+			}
+		}
+
 		let body = "";
 		let tooLarge = false;
 		const MAX_BODY = 1024 * 1024;
@@ -103,6 +113,21 @@ export function stopProxyServer(): void {
 		proxyServer = null;
 		info("Proxy server stopped");
 	}
+}
+
+/**
+ * Accepts `Authorization: Bearer <token>` or the bare token. Used to keep
+ * publicly-tunneled proxy endpoints from triggering agent runs unauthenticated.
+ */
+export function checkProxyAuth(
+	authHeader: string | undefined,
+	token: string,
+): boolean {
+	if (!authHeader) return false;
+	const value = authHeader.startsWith("Bearer ")
+		? authHeader.slice("Bearer ".length)
+		: authHeader;
+	return value.trim() === token;
 }
 
 function enrichTeamsMessage(

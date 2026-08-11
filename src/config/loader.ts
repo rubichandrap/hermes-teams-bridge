@@ -34,6 +34,7 @@ const ENV_KEY_MAP: Record<string, keyof BridgeConfig> = {
 	TEAMS_BRIDGE_HERMES_BIN: "hermesBin",
 	TEAMS_BRIDGE_DB_PATH: "dbPath",
 	TEAMS_BRIDGE_SESSION_POLL_MS: "sessionPollMs",
+	TEAMS_BRIDGE_PROXY_TOKEN: "proxyToken",
 };
 
 function resolveDbPath(): string {

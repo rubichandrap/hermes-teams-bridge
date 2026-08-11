@@ -82,7 +82,7 @@ src/index.ts                    Bootstrap
 | `src/core/session-lifecycle.ts` | Core logic: parse sessions, run security, forward responses, retry |
 | `src/store/hermes-store.ts` | Read-only SQLite adapter: row → `SessionEntry` mapping, `[TEAMS_META]` discovery |
 | `src/agent/runner.ts` | Spawns `hermes chat -q -Q --source teams-bridge` per inbound message |
-| `src/proxy/server.ts` | HTTP proxy (port 18790) — enriches Teams messages with condensed instructions + conversation context |
+| `src/proxy/server.ts` | HTTP proxy (port 18790) — enriches Teams messages with condensed instructions + conversation context; optional bearer-token auth (`TEAMS_BRIDGE_PROXY_TOKEN`) |
 | `src/forwarder/flow2.ts` | POSTs AI responses to Power Automate Flow 2 (100s timeout) |
 | `src/session/parser.ts` | Parses `[TEAMS_META]` blocks (full `[...]...[/...]` match only — bare mentions ignored), extracts assistant text, strips HTML |
 | `src/watcher/db-watcher.ts` | Polls the session store (default 2000ms) for changed sessions carrying Teams metadata |
