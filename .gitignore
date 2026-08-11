@@ -1,0 +1,47 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+
+# Environment variables & secrets
+.env
+.env*.local
+
+# Runtime state & contexts
+contexts/
+state.json*
+failed.json
+
+# Logs
+*.log
+
+# Test coverage
+coverage/
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# AI artifacts
+.agents
+!.agents/.gitkeep
+.claude
+!.claude/.gitkeep
+.codex
+!.codex/.gitkeep
+.commandcode
+.commandcode/.gitkeep
+.gemini
+.gemini/.gitkeep
+.kiro
+.kiro/.gitkeep
+.opencode
+.opencode/.gitkeep
+
+.mcp.json
+
+skills-lock.json
+
+# Graphify artifacts
+graphify-out
