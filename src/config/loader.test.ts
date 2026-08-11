@@ -41,11 +41,11 @@ describe("loadConfig", () => {
 		expect(config.agents.main?.flow2Url).toBe("https://example.com/main");
 	});
 
-	it("resolves per-agent profiles and extraArgs from config.json", () => {
+	it("resolves per-agent profiles from config.json", () => {
 		process.env.TEAMS_BRIDGE_FLOW2_URL = "https://example.com/flow2";
 
 		const config = loadConfig();
 		expect(config.agents.main?.profile).toBe("default");
-		expect(config.agents.stevbot?.profile).toBe("stevbot");
+		expect(config.agents.main?.signature).toBe("[🤖 Rubot]");
 	});
 });

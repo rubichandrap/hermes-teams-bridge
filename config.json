@@ -16,10 +16,6 @@
     "main": {
       "signature": "[🤖 Rubot]",
       "profile": "default"
-    },
-    "stevbot": {
-      "signature": "[🤡 Stevbot]",
-      "profile": "stevbot"
     }
   }
 }

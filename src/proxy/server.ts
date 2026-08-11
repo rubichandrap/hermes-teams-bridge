@@ -64,6 +64,12 @@ export function startProxyServer(config: BridgeConfig): void {
 					return;
 				}
 
+				if (!String(payload.message ?? "").trim()) {
+					res.writeHead(400, { "Content-Type": "application/json" });
+					res.end(JSON.stringify({ error: "Empty message" }));
+					return;
+				}
+
 				const enrichedPayload = enrichTeamsMessage(payload, config);
 
 				if (enrichedPayload.message !== payload.message) {
