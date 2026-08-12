@@ -2,7 +2,7 @@ import http from "node:http";
 import type { DispatchService } from "../dispatcher/turn-dispatcher";
 import { parseTeamsMetadataFromText } from "../session/parser";
 import type { BridgeConfig } from "../types";
-import { debug, error, info } from "../utils/logger";
+import { debug, error, info, warn } from "../utils/logger";
 
 let proxyServer: http.Server | null = null;
 
@@ -26,6 +26,7 @@ export function startProxyServer(
 			const authHeader = req.headers.authorization;
 			const auth = Array.isArray(authHeader) ? authHeader[0] : authHeader;
 			if (!checkProxyAuth(auth, config.proxyToken)) {
+				warn("Proxy: rejected request — missing or invalid bearer token");
 				res.writeHead(401, { "Content-Type": "application/json" });
 				res.end(JSON.stringify({ error: "Unauthorized" }));
 				return;
@@ -56,6 +57,7 @@ export function startProxyServer(
 				const agentId = String(payload.agentId ?? "main");
 				const agent = config.agents[agentId];
 				if (!agent) {
+					warn(`Proxy: rejected request — unknown agent "${agentId}" (agent=${agentId})`);
 					res.writeHead(400, { "Content-Type": "application/json" });
 					res.end(JSON.stringify({ error: `Unknown agent: ${agentId}` }));
 					return;
@@ -63,6 +65,7 @@ export function startProxyServer(
 
 				const message = String(payload.message ?? "");
 				if (!message.trim()) {
+					warn("Proxy: rejected request — empty message");
 					res.writeHead(400, { "Content-Type": "application/json" });
 					res.end(JSON.stringify({ error: "Empty message" }));
 					return;
@@ -70,6 +73,7 @@ export function startProxyServer(
 
 				const meta = parseTeamsMetadataFromText(message);
 				if (!meta?.conversationId) {
+					warn("Proxy: rejected request — missing conversationId in TEAMS_META");
 					res.writeHead(400, { "Content-Type": "application/json" });
 					res.end(
 						JSON.stringify({
