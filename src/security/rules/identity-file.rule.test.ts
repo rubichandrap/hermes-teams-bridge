@@ -22,7 +22,6 @@ describe("IdentityFileRule", () => {
 			["modify karakter", "modify karakter config"],
 			["update personality", "update personality file"],
 			["edit config.json", "edit config.json settings"],
-			["update openclaw.json", "update openclaw.json"],
 			["modify settings", "modify settings file"],
 			[".json edit", "config.json edit needs care"],
 			[".config update", "the app.config update is ready"],

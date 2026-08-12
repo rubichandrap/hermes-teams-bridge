@@ -29,11 +29,6 @@ export interface BridgeConfig {
 	proxyPort: number;
 	signature: string;
 	lookbackMinutes: number;
-	maxContextMessages: number;
-	contextSummaryLength: number;
-	enrichResponses: boolean;
-	contextMode: "reply-chain" | "conversation";
-	contextMaxAgeDays: number;
 	responseTimeoutSeconds: number;
 	responseSettleMs: number;
 	timeoutFallbackMessage: string;
@@ -57,25 +52,8 @@ export interface BridgeConfig {
 	agents: Record<string, AgentConfig>;
 }
 
-export interface ConversationMessage {
-	role: "user" | "assistant";
-	text: string;
-	timestamp: string | null;
-	entryId: string;
-	metadata?: TeamsMetadata;
-}
-
-export interface ContextData {
-	conversationId: string;
-	firstSeen: string;
-	lastUpdated: string;
-	messages: ConversationMessage[];
-	summary: string;
-}
-
 /**
  * A Hermes store message mapped to the shape the parser consumes.
- * Mirrors an OpenClaw session-file entry so extraction logic stays portable.
  */
 export interface SessionEntry {
 	type: string;

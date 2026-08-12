@@ -1,8 +1,4 @@
-import type {
-	ConversationMessage,
-	SessionEntry,
-	TeamsMetadata,
-} from "../types";
+import type { SessionEntry, TeamsMetadata } from "../types";
 
 /**
  * Session parsing utilities
@@ -74,16 +70,7 @@ export function parseTeamsMetadataFromText(text: string): TeamsMetadata | null {
 	return meta;
 }
 
-export const INJECTION_MARKER_CONTEXT = "📜";
 export const INJECTION_MARKER_INSTRUCTION = "📋";
-export const INJECTION_TOPICS_PREFIX = "Topics:";
-
-export function buildInjectedContext(
-	contextRef: string,
-	instruction: string,
-): string {
-	return [contextRef, instruction].filter(Boolean).join("\n\n");
-}
 
 export function hasTeamsMetadata(entries: SessionEntry[]): boolean {
 	for (const entry of entries) {
@@ -170,88 +157,10 @@ export function getLatestAssistantActivity(
 	return null;
 }
 
-export function extractConversationHistory(
-	entries: SessionEntry[],
-): ConversationMessage[] {
-	const messages: ConversationMessage[] = [];
-	const seen = new Set<string>();
-
-	for (let i = 0; i < entries.length; i++) {
-		const entry = entries[i]!;
-		if (entry.type !== "message") continue;
-
-		const msg = entry.message ?? {};
-		const role = msg.role;
-		if (role !== "user" && role !== "assistant") continue;
-
-		const rawText = getMessageText(msg).trim();
-		if (!rawText || rawText === "NO_REPLY") continue;
-
-		let metadata: TeamsMetadata | undefined;
-		let text = rawText;
-
-		if (role === "user") {
-			const parsed = parseMessage(rawText);
-			text = parsed.text;
-			if (Object.keys(parsed.metadata).length > 0) metadata = parsed.metadata;
-		}
-
-		const ts = msg.timestamp ?? entry.timestamp ?? null;
-		const dedupKey = `${role}|${text.substring(0, 100)}|${ts}`;
-		if (seen.has(dedupKey)) continue;
-
-		seen.add(dedupKey);
-		messages.push({
-			role,
-			text,
-			timestamp: ts,
-			entryId: entry.id ?? `idx-${i}`,
-			...(metadata && { metadata }),
-		});
-	}
-
-	return messages;
-}
-
-export function isReplyMessage(metadata: TeamsMetadata): boolean {
-	const hasRef = String(metadata.hasMessageReference ?? "").toLowerCase();
-	if (hasRef === "true") return true;
-
-	const hasAttachments =
-		Number.parseInt(String(metadata.hasAttachments), 10) || 0;
-	if (hasAttachments > 0) return true;
-
-	if (
-		metadata.replyToMessageId &&
-		metadata.replyToMessageId !== metadata.teamsMessageId
-	) {
-		return true;
-	}
-	if (metadata.replyToId && metadata.replyToId !== metadata.teamsMessageId) {
-		return true;
-	}
-
-	return false;
-}
-
 function stripTeamsMeta(text: string): string {
 	return String(text ?? "")
 		.replace(/\[TEAMS_META\][\s\S]*?\[\/TEAMS_META\]/i, "")
 		.trim();
-}
-
-function stripOpenClawWebhookWrapper(text: string): string {
-	let value = String(text ?? "");
-
-	const endIdx = value.indexOf("<<<END_EXTERNAL_UNTRUSTED_CONTENT");
-	if (endIdx >= 0) {
-		value = value.slice(0, endIdx).trim();
-
-		const sepIdx = value.indexOf("---\n");
-		if (sepIdx >= 0) value = value.slice(sepIdx + 4).trim();
-	}
-
-	return value;
 }
 
 function stripHtml(html: string): string {
@@ -288,23 +197,14 @@ function stripHtml(html: string): string {
 function stripInjectedContext(text: string): string {
 	const lines = String(text ?? "").split("\n");
 	const result: string[] = [];
-	let lastLineWasMarker = false;
 	let stripping = true;
 
 	for (const line of lines) {
 		const trimmed = line.trim();
 		if (stripping) {
-			if (trimmed === "") {
-				lastLineWasMarker = false;
-				continue;
-			}
+			if (trimmed === "") continue;
 
-			if (trimmed.startsWith("📜") || trimmed.startsWith("📋")) {
-				lastLineWasMarker = true;
-				continue;
-			}
-
-			if (lastLineWasMarker && trimmed.startsWith("Topics:")) continue;
+			if (trimmed.startsWith("📋")) continue;
 
 			stripping = false;
 		}
@@ -319,9 +219,7 @@ export function parseMessage(raw: string): {
 	text: string;
 	metadata: TeamsMetadata;
 } {
-	const text = stripInjectedContext(
-		stripHtml(stripOpenClawWebhookWrapper(stripTeamsMeta(raw))),
-	);
+	const text = stripInjectedContext(stripHtml(stripTeamsMeta(raw)));
 	const metadata = parseTeamsMetadataFromText(raw) ?? {};
 	return { text, metadata };
 }

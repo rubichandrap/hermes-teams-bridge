@@ -19,7 +19,10 @@ interface RegistryData {
 const SEVERED_TTL_MS = 24 * 60 * 60 * 1000;
 
 /** Composite key shared by the registry and the dispatcher's queue. */
-export function conversationKey(agentId: string, conversationId: string): string {
+export function conversationKey(
+	agentId: string,
+	conversationId: string,
+): string {
 	return `${agentId}::${conversationId}`;
 }
 

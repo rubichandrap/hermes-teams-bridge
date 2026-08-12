@@ -44,8 +44,6 @@ src/index.ts                    Bootstrap
             ├─ src/store/hermes-store.ts  Read-only node:sqlite adapter over Hermes state.db
             ├─ src/forwarder/flow2.ts     POST to Power Automate Flow 2
             ├─ src/state/manager.ts       Dedup, retry (3 max), failed tracking
-            ├─ src/context/manager.ts     Per-conversation JSON context
-            ├─ src/context/md-writer.ts   Conversation Markdown for AI context
             └─ src/security/index.ts      Strategy-pattern security scanner
        ├─ src/watcher/db-watcher.ts       Polls state.db for [TEAMS_META] session activity
        ├─ src/agent/runner.ts             Spawns `hermes chat -q -Q --source teams-bridge` (bootstrap/resume by session id)
@@ -64,7 +62,7 @@ src/index.ts                    Bootstrap
 
 | OpenClaw bridge | Hermes bridge |
 |-----------------|---------------|
-| `fs.watch` on `~/.openclaw/agents/<id>/sessions/*.jsonl` | Poll `~/.hermes/state.db` (SQLite, WAL) every `sessionPollMs` |
+| `fs.watch` on OpenClaw agent session files | Poll `~/.hermes/state.db` (SQLite, WAL) every `sessionPollMs` |
 | Session files parsed as JSONL | `messages` rows mapped to the same `SessionEntry` shape |
 | Tool calls = content parts `{type:"toolCall"}` | `tool_calls` column non-empty OR `finish_reason = "tool_calls"` |
 | Proxy POSTs to OpenClaw webhook (port 18789) | Proxy spawns `hermes chat -q -Q --source teams-bridge` |
@@ -91,8 +89,6 @@ src/index.ts                    Bootstrap
 | `src/session/parser.ts` | Parses `[TEAMS_META]` blocks (full `[...]...[/...]` match only — bare mentions ignored), extracts assistant text, strips HTML |
 | `src/watcher/db-watcher.ts` | Polls the session store (default 2000ms) for changed sessions carrying Teams metadata |
 | `src/state/manager.ts` | Dedup (`forwarded`/`forwardedByMessageId`), retry (3 max, `msgId`-stable counting), failed audit |
-| `src/context/manager.ts` | Per-conversation JSON context CRUD in `contexts/` dir |
-| `src/context/md-writer.ts` | Writes conversation history as Markdown; skips context injection when all topics are empty |
 | `src/security/index.ts` | Security scanner — strategy pattern with pluggable rules |
 | `src/config/loader.ts` | Config loading: defaults → config.json → .env (TEAMS_BRIDGE_* prefix) |
 | `src/types/index.ts` | All domain types (BridgeConfig, TeamsMetadata, SessionEntry, etc.) |

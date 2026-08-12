@@ -6,12 +6,12 @@
 
 **Status:** ready-for-agent
 
-- [ ] No `.openclaw` references remain in code, tests, or docs
-- [ ] Markdown conversation files and their directory are no longer created — the `~/.openclaw` directory is never (re)created
-- [ ] Per-conversation context JSON files and their manager are removed
-- [ ] Injection markers, context-reference builders, and the OpenClaw webhook-wrapper strip are removed from parsing
-- [ ] Context config keys (`contextMode`, `maxContextMessages`, `contextSummaryLength`, `contextMaxAgeDays`, `enrichResponses`) removed from the config surface and validation
-- [ ] Context cleanup jobs removed
-- [ ] Security rules no longer reference OpenClaw artifacts
-- [ ] The per-turn instruction line and its stripping for forwarded raw messages are retained
-- [ ] `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` all green with the deletions
+- [x] No `.openclaw` references remain in code, tests, or docs
+- [x] Markdown conversation files and their directory are no longer created — the `~/.openclaw` directory is never (re)created
+- [x] Per-conversation context JSON files and their manager are removed
+- [x] Injection markers, context-reference builders, and the OpenClaw webhook-wrapper strip are removed from parsing
+- [x] Context config keys (`contextMode`, `maxContextMessages`, `contextSummaryLength`, `contextMaxAgeDays`, `enrichResponses`) removed from the config surface and validation
+- [x] Context cleanup jobs removed
+- [x] Security rules no longer reference OpenClaw artifacts
+- [x] The per-turn instruction line and its stripping for forwarded raw messages are retained
+- [x] `npm run typecheck`, `npm run lint`, `npm run test`, `npm run build` all green with the deletions

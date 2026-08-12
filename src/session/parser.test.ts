@@ -1,8 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { SessionEntry } from "../types";
 import {
-	buildInjectedContext,
-	extractConversationHistory,
 	extractLatestAssistantText,
 	getLatestAssistantActivity,
 	hasNoReply,
@@ -22,9 +20,6 @@ function entry(role: string, content: string): SessionEntry {
 }
 
 const ENRICHED = [
-	"📜 [5 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-	"Topics: weather · travel",
-	"",
 	INSTRUCTION,
 	"",
 	"[TEAMS_META]",
@@ -133,7 +128,7 @@ describe("parseMessage", () => {
 		expect(result.metadata.senderName).toBe("Tester");
 	});
 
-	it("recovers the payload from buildInjectedContext output (round-trip)", () => {
+	it("recovers the payload from the instruction-prefixed message (round-trip)", () => {
 		const payload = [
 			"[TEAMS_META]",
 			"conversationId: conv-1",
@@ -142,10 +137,7 @@ describe("parseMessage", () => {
 			"",
 			"Hello there",
 		].join("\n");
-		const contextRef =
-			"📜 [2 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md\nTopics: hello";
-		const injected =
-			buildInjectedContext(contextRef, INSTRUCTION) + "\n\n" + payload;
+		const injected = `${INSTRUCTION}\n\n${payload}`;
 		const result = parseMessage(injected);
 		expect(result.text).toBe("Hello there");
 		expect(result.metadata.conversationId).toBe("conv-1");
@@ -157,34 +149,13 @@ describe("parseMessage", () => {
 		expect(result.metadata).toEqual({});
 	});
 
-	it("preserves natural --- separators without the envelope end marker", () => {
+	it("keeps payloads without the instruction block unchanged", () => {
 		const result = parseMessage("hello\n---\nworld");
 		expect(result.text).toBe("hello\n---\nworld");
 	});
 
-	it("strips the webhook wrapper only when the end marker is present", () => {
-		const wrapped = [
-			"Task: Teams: Test",
-			"",
-			"SECURITY NOTICE: external content",
-			"---",
-			"[TEAMS_META]",
-			"conversationId: conv-1",
-			"teamsMessageId: msg-1",
-			"[/TEAMS_META]",
-			"",
-			"what is up",
-			"<<<END_EXTERNAL_UNTRUSTED_CONTENT",
-		].join("\n");
-		const result = parseMessage(wrapped);
-		expect(result.text).toBe("what is up");
-	});
-
-	it("decodes entity-encoded markers before stripping them", () => {
+	it("decodes entity-encoded instruction markers before stripping them", () => {
 		const encoded = [
-			"&#128220; [5 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-			"Topics: weather",
-			"",
 			"&#128203; Reply with ONE final message",
 			"",
 			"[TEAMS_META]",
@@ -198,11 +169,8 @@ describe("parseMessage", () => {
 		expect(result.text).toBe("body text");
 	});
 
-	it("keeps markers quoted inside the payload body", () => {
+	it("keeps marker-looking text inside the payload body", () => {
 		const withQuote = [
-			"📜 [1 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-			"Topics: weather",
-			"",
 			INSTRUCTION,
 			"",
 			"[TEAMS_META]",
@@ -216,13 +184,10 @@ describe("parseMessage", () => {
 		expect(result.text).toBe("I said 📜 and 📋 in my message");
 	});
 
-	it("strips repeated marker lines", () => {
+	it("strips repeated instruction lines", () => {
 		const repeated = [
-			"📜 [3 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-			"📜 [2 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-2.md",
-			"Topics: weather",
-			"",
 			INSTRUCTION,
+			"📋 Reply with ONE final message",
 			"",
 			"[TEAMS_META]",
 			"conversationId: conv-1",
@@ -235,10 +200,8 @@ describe("parseMessage", () => {
 		expect(result.text).toBe("payload");
 	});
 
-	it("keeps a payload that opens with Topics: after a blank line", () => {
+	it("keeps a payload that opens with Topics:", () => {
 		const ambiguous = [
-			"📜 [1 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-			"",
 			INSTRUCTION,
 			"",
 			"[TEAMS_META]",
@@ -256,36 +219,6 @@ describe("parseMessage", () => {
 		const result = parseMessage("no meta here");
 		expect(result.text).toBe("no meta here");
 		expect(Object.keys(result.metadata)).toHaveLength(0);
-	});
-});
-
-describe("extractConversationHistory", () => {
-	it("keeps enriched user message text in conversation history", () => {
-		const history = extractConversationHistory([entry("user", ENRICHED)]);
-		expect(history).toHaveLength(1);
-		expect(history[0]?.text).toBe("What is the weather today?");
-		expect(history[0]?.metadata?.conversationId).toBe("conv-1");
-	});
-
-	it("keeps plain meta-less user messages", () => {
-		const history = extractConversationHistory([entry("user", "hi")]);
-		expect(history).toHaveLength(1);
-		expect(history[0]?.text).toBe("hi");
-		expect(history[0]?.metadata).toBeUndefined();
-	});
-
-	it("does not strip assistant messages", () => {
-		const history = extractConversationHistory([
-			entry("user", "hi"),
-			entry(
-				"assistant",
-				"[TEAMS_META]\nconversationId: c\n[/TEAMS_META]\n\nresponse",
-			),
-		]);
-		expect(history).toHaveLength(2);
-		expect(history[1]?.text).toBe(
-			"[TEAMS_META]\nconversationId: c\n[/TEAMS_META]\n\nresponse",
-		);
 	});
 });
 

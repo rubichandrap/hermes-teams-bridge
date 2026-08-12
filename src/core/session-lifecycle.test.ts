@@ -136,11 +136,6 @@ function makeConfig(tmpDir: string): BridgeConfig {
 		proxyPort: 18790,
 		signature: "[SIG]",
 		lookbackMinutes: 10,
-		maxContextMessages: 50,
-		contextSummaryLength: 500,
-		enrichResponses: false,
-		contextMode: "conversation",
-		contextMaxAgeDays: 30,
 		responseTimeoutSeconds: 1,
 		responseSettleMs: 1,
 		timeoutFallbackMessage:
@@ -334,7 +329,6 @@ describe("SessionLifecycle harness", () => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-lifecycle-"));
 		sessionsDir = path.join(tmpDir, "sessions");
 		fs.mkdirSync(sessionsDir, { recursive: true });
-		fs.mkdirSync(path.join(tmpDir, "contexts"), { recursive: true });
 		process.env.HOME = tmpDir;
 		process.chdir(tmpDir);
 		vi.resetModules();
@@ -374,12 +368,6 @@ describe("SessionLifecycle harness", () => {
 		const state = await waitForForwarded(tmpDir, "main::s1::ai-1");
 		expect(state.forwardedByMessageId["msg-1"]).toBeDefined();
 		expect(fs.existsSync(path.join(tmpDir, "failed.json"))).toBe(false);
-
-		const context = JSON.parse(
-			fs.readFileSync(path.join(tmpDir, "contexts", "conv-1.json"), "utf-8"),
-		);
-		expect(context.conversationId).toBe("conv-1");
-		expect(context.messages).toHaveLength(2);
 	});
 
 	it("forwards only the final answer, skipping mid-turn narration", async () => {

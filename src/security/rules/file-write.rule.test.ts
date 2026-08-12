@@ -24,7 +24,7 @@ describe("FileWriteRule", () => {
 			["create_file", "invoke create_file to add this"],
 			["update_file", "use update_file to change this"],
 			["modify_file", "call modify_file on the config"],
-			["home path with .json", "change ~/.openclaw/settings.json"],
+			["home path with .json", "change ~/.hermes/settings.json"],
 			["home path with config", "edit /home/user/app.config file"],
 			["memory.md", "update memory.md please"],
 			["edit memory", "edit memory to add this"],

@@ -10,7 +10,7 @@ export class IdentityFileRule implements ISecurityRule {
 		/\b(edit|update|change|modify|rewrite|write)\b.{0,30}\b(soul|identity|agents)\b/,
 		/\b(soul|identity|agents)\b.{0,30}\b(edit|update|change|modify|rewrite|write)\b/,
 		/\b(edit|update|change|modify|rewrite|write)\b.{0,30}\b(persona|who\s+you\s+are|saya\s+siapa|identitas|karakter|personality)\b/,
-		/\b(edit|update|change|modify|rewrite|write)\b.{0,30}\b(config\.json|openclaw\.json|settings)\b/,
+		/\b(edit|update|change|modify|rewrite|write)\b.{0,30}\b(config\.json|settings)\b/,
 		/\b\.(json|config)\b.{0,20}\b(edit|update|change|modify|rewrite|write)\b/,
 	];
 

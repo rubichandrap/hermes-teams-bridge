@@ -23,9 +23,6 @@ function entry(role: string, content: string): SessionEntry {
 }
 
 const ENRICHED = [
-	"📜 [5 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-	"Topics: weather · travel",
-	"",
 	INSTRUCTION,
 	"",
 	"[TEAMS_META]",
@@ -48,9 +45,6 @@ const UNENRICHED = [
 ].join("\n");
 
 const ENCODED = [
-	"&#128220; [5 msgs] Context: ~/.openclaw/workspace/memory/teams-conversations/conv-1.md",
-	"Topics: weather",
-	"",
 	"&#128203; Reply with ONE final message",
 	"",
 	"[TEAMS_META]",
@@ -59,20 +53,6 @@ const ENCODED = [
 	"[/TEAMS_META]",
 	"",
 	"body text",
-].join("\n");
-
-const WRAPPED = [
-	"Task: Teams: Test",
-	"",
-	"SECURITY NOTICE: external content",
-	"---",
-	"[TEAMS_META]",
-	"conversationId: conv-1",
-	"teamsMessageId: msg-1",
-	"[/TEAMS_META]",
-	"",
-	"what is up",
-	"<<<END_EXTERNAL_UNTRUSTED_CONTENT",
 ].join("\n");
 
 function requestSpy(): MockInstance<typeof https.request> {
@@ -244,7 +224,7 @@ describe("categorizeHttpError", () => {
 });
 
 describe("extractOriginalUserMessage", () => {
-	it("returns the user's text with Re: prefix for an enriched session", () => {
+	it("returns the user's text with Re: prefix for an instruction-prefixed session", () => {
 		const result = extractOriginalUserMessage([
 			entry("assistant", "Let me check"),
 			entry("user", ENRICHED),
@@ -261,20 +241,12 @@ describe("extractOriginalUserMessage", () => {
 		expect(result).toBe("Re: Hello there");
 	});
 
-	it("strips entity-encoded injection markers (canonical order at the seam)", () => {
+	it("strips entity-encoded instruction markers", () => {
 		const result = extractOriginalUserMessage([
 			entry("user", ENCODED),
 			entry("assistant", "OK"),
 		]);
 		expect(result).toBe("Re: body text");
-	});
-
-	it("strips the webhook envelope wrapper", () => {
-		const result = extractOriginalUserMessage([
-			entry("user", WRAPPED),
-			entry("assistant", "OK"),
-		]);
-		expect(result).toBe("Re: what is up");
 	});
 
 	it("passes meta-less plain messages through without claiming them", () => {

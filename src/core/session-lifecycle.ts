@@ -1,5 +1,3 @@
-import { clearContext, loadContext, updateContext } from "../context/manager";
-import { saveConversationMd } from "../context/md-writer";
 import {
 	BREAKER_COOLDOWN_MS,
 	extractOriginalUserMessage,
@@ -7,13 +5,11 @@ import {
 } from "../forwarder/flow2";
 import { SecurityScanner } from "../security";
 import {
-	extractConversationHistory,
 	extractLatestAssistantText,
 	extractTeamsMetadata,
 	getLatestAssistantActivity,
 	hasNoReply,
 	hasTeamsMetadata,
-	isReplyMessage,
 } from "../session/parser";
 import {
 	getRetryCategory,
@@ -371,17 +367,6 @@ export class SessionLifecycle {
 			return;
 		}
 
-		const conversationHistory = extractConversationHistory(entries);
-		const isReply = isReplyMessage(metadata);
-		if (this.config.contextMode === "reply-chain" && !isReply) {
-			clearContext(metadata.conversationId);
-		}
-		updateContext(
-			metadata.conversationId,
-			conversationHistory,
-			this.config.maxContextMessages,
-		);
-
 		const rawMessage = extractOriginalUserMessage(entries);
 		const securityResult = this.scanner.scan(rawMessage);
 
@@ -409,10 +394,6 @@ export class SessionLifecycle {
 		}
 
 		const responseText = msg.text;
-		const contextData = loadContext(metadata.conversationId);
-		if (contextData?.messages?.length) {
-			saveConversationMd(metadata.conversationId, contextData.messages);
-		}
 
 		info(
 			`${agentId}/${sessionId}: Forwarding preview: "${responseText.substring(0, 80)}..."`,

@@ -12,11 +12,6 @@ const DEFAULT_CONFIG: Partial<BridgeConfig> = {
 	proxyPort: 18790,
 	signature: "[🤖 Rubot]",
 	lookbackMinutes: 10,
-	maxContextMessages: 50,
-	contextSummaryLength: 500,
-	enrichResponses: true,
-	contextMode: "reply-chain",
-	contextMaxAgeDays: 30,
 	responseTimeoutSeconds: 180,
 	responseSettleMs: 5000,
 	timeoutFallbackMessage:
@@ -174,11 +169,6 @@ function validateConfig(config: BridgeConfig): void {
 
 	if (config.proxyMode && (!config.proxyPort || config.proxyPort <= 0)) {
 		fatal(`Invalid proxy settings: proxyPort=${config.proxyPort}`);
-		process.exit(1);
-	}
-
-	if (!["reply-chain", "conversation"].includes(config.contextMode)) {
-		fatal(`Invalid contextMode: ${config.contextMode}`);
 		process.exit(1);
 	}
 
