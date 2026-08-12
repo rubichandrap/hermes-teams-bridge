@@ -69,11 +69,6 @@ function makeConfig(overrides: Partial<BridgeConfig> = {}): BridgeConfig {
 		proxyPort: 18790,
 		signature: "[SIG]",
 		lookbackMinutes: 10,
-		maxContextMessages: 50,
-		contextSummaryLength: 500,
-		enrichResponses: false,
-		contextMode: "conversation",
-		contextMaxAgeDays: 30,
 		responseTimeoutSeconds: 1,
 		responseSettleMs: 1,
 		timeoutFallbackMessage: "timeout",
@@ -216,6 +211,37 @@ describe("TurnDispatcher", () => {
 		expect(runner.renames).toEqual([
 			{ sessionId: "20260811_000000_bbb222", title: "teams:conv-1" },
 		]);
+	});
+
+	it("rejects fallback association of a session that predates the pending bootstrap", async () => {
+		registry.markPendingBootstrap("main", "conv-1");
+		const pendingTs = registry.getPendingBootstrapTs("main", "conv-1")!;
+
+		// A pre-reset session still inside the lookback window (probe scenario).
+		const stale = dispatcher.associateIfPending(
+			"main",
+			"20260811_000000_old999",
+			"conv-1",
+			pendingTs - 1000,
+		);
+		expect(stale).toBe(false);
+		expect(registry.get("main", "conv-1")).toBeUndefined();
+		// Pending marker survives so the genuine bootstrap product can still associate.
+		expect(registry.hasPendingBootstrap("main", "conv-1")).toBe(true);
+		expect(runner.renames).toHaveLength(0);
+
+		// The actual bootstrap session (born after the pending marker) associates.
+		const fresh = dispatcher.associateIfPending(
+			"main",
+			"20260811_000000_bbb222",
+			"conv-1",
+			pendingTs + 1000,
+		);
+		expect(fresh).toBe(true);
+		expect(registry.get("main", "conv-1")?.sessionId).toBe(
+			"20260811_000000_bbb222",
+		);
+		expect(registry.hasPendingBootstrap("main", "conv-1")).toBe(false);
 	});
 
 	it("never registers sessions that were not bootstrap-spawned (manual pastes)", async () => {

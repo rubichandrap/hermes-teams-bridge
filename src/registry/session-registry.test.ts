@@ -7,19 +7,23 @@ import { SessionRegistry } from "./session-registry";
 describe("SessionRegistry", () => {
 	let tmpDir: string;
 	let filePath: string;
+	let lastRegistry: SessionRegistry | null = null;
 
 	beforeEach(() => {
 		tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "bridge-registry-"));
 		filePath = path.join(tmpDir, "registry.json");
 	});
 
-	afterEach(() => {
+	afterEach(async () => {
+		// Let any in-flight atomic flush finish before removing the directory.
+		await lastRegistry?.flushAndWait();
 		fs.rmSync(tmpDir, { recursive: true, force: true });
 	});
 
 	function makeRegistry(): SessionRegistry {
 		const registry = new SessionRegistry(filePath);
 		registry.load();
+		lastRegistry = registry;
 		return registry;
 	}
 

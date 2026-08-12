@@ -136,6 +136,7 @@ describe("SqliteStore", () => {
 		expect(refs.map((r) => r.sessionId)).toEqual(["s-meta"]);
 		expect(refs[0]?.profileName).toBe("default");
 		expect(refs[0]?.lastActivityAt).toBe(1_700_001_000 * 1000);
+		expect(refs[0]?.startedAtMs).toBe(1_700_001_000 * 1000);
 		store.close();
 	});
 

@@ -1,7 +1,7 @@
 import { type TurnRunner, defaultTurnRunner } from "../agent/runner";
 import {
-	conversationKey,
 	type SessionRegistry,
+	conversationKey,
 } from "../registry/session-registry";
 import { parseMessage } from "../session/parser";
 import type { AgentConfig, BridgeConfig } from "../types";
@@ -116,6 +116,7 @@ export class TurnDispatcher {
 		agentId: string,
 		sessionId: string,
 		conversationId: string | undefined,
+		startedAtMs?: number,
 	): boolean {
 		if (!conversationId) return false;
 		this.registry.purgeExpiredPending(PENDING_BOOTSTRAP_TTL_MS);
@@ -128,6 +129,12 @@ export class TurnDispatcher {
 			this.registry.clearPendingBootstrap(agentId, conversationId);
 			debug(
 				`${agentId}/${conversationId}: Pending bootstrap severed by reset, not associating`,
+			);
+			return false;
+		}
+		if (startedAtMs !== undefined && startedAtMs < pendingTs) {
+			debug(
+				`${agentId}/${conversationId}: Session ${sessionId} predates pending bootstrap — not associating`,
 			);
 			return false;
 		}

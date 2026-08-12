@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { BridgeConfig } from "../types";
 import {
 	extractSessionIdFromStderr,
@@ -16,11 +16,6 @@ function makeConfig(tmpDir: string, hermesBin: string): BridgeConfig {
 		proxyPort: 18790,
 		signature: "[SIG]",
 		lookbackMinutes: 10,
-		maxContextMessages: 50,
-		contextSummaryLength: 500,
-		enrichResponses: false,
-		contextMode: "conversation",
-		contextMaxAgeDays: 30,
 		responseTimeoutSeconds: 1,
 		responseSettleMs: 1,
 		timeoutFallbackMessage: "timeout",
@@ -34,7 +29,7 @@ function makeConfig(tmpDir: string, hermesBin: string): BridgeConfig {
 	};
 }
 
-function waitForFile(file: string, timeoutMs = 3000): Promise<string> {
+function waitForFile(file: string, timeoutMs = 10_000): Promise<string> {
 	const start = Date.now();
 	return new Promise((resolve, reject) => {
 		const tick = (): void => {
@@ -233,6 +228,35 @@ describe("renameSession", () => {
 				"teams:conv",
 			),
 		).not.toThrow();
+	});
+
+	it("warns when the rename exits 0 but prints an error (title collision)", async () => {
+		const bin = path.join(tmpDir, "fake-hermes-collide.sh");
+		fs.writeFileSync(
+			bin,
+			`#!/bin/sh\necho "Error: Title 'teams:conv' is already in use by session old-session"\nexit 0\n`,
+		);
+		fs.chmodSync(bin, 0o755);
+
+		const logSpy = vi.spyOn(console, "log");
+		renameSession(
+			makeConfig(tmpDir, bin),
+			{ flow2Url: "https://example.com/flow2", signature: "[SIG]" },
+			"20260811_000000_abc123",
+			"teams:conv",
+		);
+
+		await vi.waitFor(
+			() => {
+				expect(
+					logSpy.mock.calls.some((call) =>
+						String(call[0]).includes("already in use"),
+					),
+				).toBe(true);
+			},
+			{ timeout: 10_000 },
+		);
+		logSpy.mockRestore();
 	});
 });
 

@@ -1,5 +1,4 @@
 import path from "node:path";
-import { cleanupOldContexts, ensureDirectory } from "../context/manager";
 import { TurnDispatcher } from "../dispatcher/turn-dispatcher";
 import { startProxyServer, stopProxyServer } from "../proxy/server";
 import { SessionRegistry } from "../registry/session-registry";
@@ -35,10 +34,8 @@ export class BridgeOrchestrator {
 	}
 
 	async start(): Promise<void> {
-		ensureDirectory();
 		loadState();
 		this.registry.load();
-		cleanupOldContexts(this.config.contextMaxAgeDays);
 
 		info(
 			"=== Hermes Teams Bridge Daemon v1.0 (Hermes Agent + TypeScript) started ===",
@@ -72,6 +69,7 @@ export class BridgeOrchestrator {
 							agentId,
 							ref.sessionId,
 							this.conversationIdFor(ref.sessionId),
+							ref.startedAtMs,
 						);
 						return { agentId, sessionId: ref.sessionId };
 					})
@@ -101,6 +99,7 @@ export class BridgeOrchestrator {
 					agentId,
 					ref.sessionId,
 					this.conversationIdFor(ref.sessionId),
+					ref.startedAtMs,
 				);
 				tagged.push({ agentId, sessionId: ref.sessionId });
 			}

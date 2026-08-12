@@ -8,6 +8,8 @@ import { debug, error } from "../utils/logger";
 export interface TeamSessionRef {
 	sessionId: string;
 	lastActivityAt: number;
+	/** Session start (epoch ms); the fallback uses it to reject pre-bootstrap sessions. */
+	startedAtMs?: number;
 	/** Hermes profile the session ran under (NULL for the default profile). */
 	profileName: string;
 }
@@ -77,7 +79,7 @@ export class SqliteStore implements SessionStore {
 		try {
 			const rows = this.db
 				.prepare(
-					`SELECT DISTINCT s.id AS session_id, s.last_activity_at, s.profile_name
+					`SELECT DISTINCT s.id AS session_id, s.last_activity_at, s.started_at, s.profile_name
 					 FROM sessions s
 					 JOIN messages m ON m.session_id = s.id
 					 WHERE s.last_activity_at > ?
@@ -87,6 +89,7 @@ export class SqliteStore implements SessionStore {
 				.all(sinceMs / 1000) as {
 				session_id: string;
 				last_activity_at: number | null;
+				started_at: number | null;
 				profile_name: string | null;
 			}[];
 
@@ -95,6 +98,7 @@ export class SqliteStore implements SessionStore {
 				lastActivityAt: row.last_activity_at
 					? row.last_activity_at * 1000
 					: Date.now(),
+				...(row.started_at && { startedAtMs: row.started_at * 1000 }),
 				profileName: row.profile_name ?? "default",
 			}));
 		} catch (err) {

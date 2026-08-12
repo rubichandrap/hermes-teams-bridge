@@ -124,10 +124,6 @@ export function spawnAgentTurn(
 			capturedSessionId ??= extractSessionIdFromStderr(stderr) ?? undefined;
 		});
 
-		child.stderr?.on("close", () => {
-			finishDone();
-		});
-
 		child.on("error", (err) => {
 			error(`Agent spawn failed: ${err.message}`);
 			resolve({ ok: false, error: err.message, done });
@@ -144,6 +140,12 @@ export function spawnAgentTurn(
 			if (code !== 0 && stderr) {
 				error(`Agent turn exited with code ${code}: ${stderr.slice(0, 500)}`);
 			}
+		});
+
+		// 'close' fires after 'exit' and every stdio stream has drained, so the
+		// exit code is recorded and the stderr capture is complete when done
+		// resolves.
+		child.on("close", () => {
 			finishDone();
 		});
 	});
@@ -168,10 +170,15 @@ export function renameSession(
 	);
 
 	let stderr = "";
+	let stdout = "";
 	const child = spawn(config.hermesBin, args, {
 		env: agentEnv(agent),
 		detached: true,
-		stdio: ["ignore", "ignore", "pipe"],
+		stdio: ["ignore", "pipe", "pipe"],
+	});
+
+	child.stdout?.on("data", (chunk: Buffer) => {
+		stdout += chunk.toString();
 	});
 
 	child.stderr?.on("data", (chunk: Buffer) => {
@@ -182,10 +189,11 @@ export function renameSession(
 		error(`Session rename spawn failed: ${err.message}`);
 	});
 
-	child.on("exit", (code) => {
-		if (code !== 0) {
+	child.on("close", (code) => {
+		const output = `${stdout}\n${stderr}`.trim();
+		if (code !== 0 || /Error:/i.test(output)) {
 			warn(
-				`Session rename failed (exit ${code}): ${stderr.slice(0, 300) || "no output"}`,
+				`Session rename failed (exit ${code ?? "?"}): ${output.slice(0, 300) || "no output"}`,
 			);
 		}
 	});
