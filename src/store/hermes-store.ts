@@ -1,3 +1,5 @@
+import fs from "node:fs";
+import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import type { SessionEntry } from "../types";
 import { debug, error } from "../utils/logger";
@@ -18,6 +20,74 @@ export interface SessionStore {
 	readSessionEntries(sessionId: string): SessionEntry[] | null;
 	listSessionsWithTeamsMeta(sinceMs: number): TeamSessionRef[];
 	close(): void;
+}
+
+/** Resolve a profile's session DB: `<hermesHome>/profiles/<name>/state.db`. */
+export function profileDbPath(hermesHome: string, profile: string): string {
+	return path.join(hermesHome, "profiles", profile, "state.db");
+}
+
+export interface ProfileDbSpec {
+	profile: string;
+	dbPath: string;
+}
+
+/**
+ * One `SessionStore` over several Hermes profile DBs. Each profile's
+ * state.db only carries that profile's sessions, so list calls merge a
+ * per-profile scan (tagged with the profile name) and reads fall through
+ * DBs until a hit. Non-default DBs open lazily — a profile may be created
+ * after this bridge started.
+ */
+export class MultiProfileStore implements SessionStore {
+	private readonly dbs = new Map<string, SqliteStore>();
+
+	constructor(private specs: ProfileDbSpec[]) {}
+
+	readSessionEntries(sessionId: string): SessionEntry[] | null {
+		for (const { store } of this.opened()) {
+			const entries = store.readSessionEntries(sessionId);
+			if (entries) return entries;
+		}
+		return null;
+	}
+
+	listSessionsWithTeamsMeta(sinceMs: number): TeamSessionRef[] {
+		const refs: TeamSessionRef[] = [];
+		for (const { profile, store } of this.opened()) {
+			for (const ref of store.listSessionsWithTeamsMeta(sinceMs)) {
+				refs.push({ ...ref, profileName: profile });
+			}
+		}
+		return refs;
+	}
+
+	close(): void {
+		for (const store of this.dbs.values()) store.close();
+		this.dbs.clear();
+	}
+
+	private opened(): { profile: string; store: SqliteStore }[] {
+		const out: { profile: string; store: SqliteStore }[] = [];
+		for (const spec of [...this.specs]) {
+			let store = this.dbs.get(spec.profile);
+			if (!store) {
+				if (!fs.existsSync(spec.dbPath)) continue;
+				try {
+					store = new SqliteStore(spec.dbPath);
+				} catch (err) {
+					error(
+						`Failed to open session store for profile "${spec.profile}" at ${spec.dbPath}: ${(err as Error).message} — profile skipped`,
+					);
+					this.specs = this.specs.filter((s) => s !== spec);
+					continue;
+				}
+				this.dbs.set(spec.profile, store);
+			}
+			out.push({ profile: spec.profile, store });
+		}
+		return out;
+	}
 }
 
 /**
