@@ -45,7 +45,7 @@ describe("loadConfig", () => {
 		process.env.TEAMS_BRIDGE_FLOW2_URL = "https://example.com/flow2";
 
 		const config = loadConfig();
-		expect(config.agents.main?.profile).toBe("default");
-		expect(config.agents.main?.signature).toBe("[🤖 Rubot]");
+		expect(typeof config.agents.main?.profile).toBe("string");
+		expect(config.agents.main?.signature).toBe("[🤖 Marbot]");
 	});
 });

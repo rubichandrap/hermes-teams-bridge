@@ -5,6 +5,8 @@ export interface RegistryEntry {
 	sessionId: string;
 	createdAt: number;
 	lastUsedAt: number;
+	/** Hermes profile the session was spawned under; "default" when omitted. */
+	profile: string;
 }
 
 interface RegistryData {
@@ -51,7 +53,12 @@ export class SessionRegistry {
 				fs.readFileSync(this.filePath, "utf-8"),
 			) as RegistryData;
 			this.data = {
-				conversations: parsed.conversations ?? {},
+				conversations: Object.fromEntries(
+					Object.entries(parsed.conversations ?? {}).map(([key, entry]) => [
+						key,
+						{ ...entry, profile: entry.profile ?? "default" },
+					]),
+				),
 				pendingBootstraps: parsed.pendingBootstraps ?? {},
 				severedAt: parsed.severedAt ?? {},
 			};
@@ -66,7 +73,12 @@ export class SessionRegistry {
 		return this.data.conversations[this.key(agentId, conversationId)];
 	}
 
-	set(agentId: string, conversationId: string, sessionId: string): void {
+	set(
+		agentId: string,
+		conversationId: string,
+		sessionId: string,
+		profile = "default",
+	): void {
 		const key = this.key(agentId, conversationId);
 		const now = Date.now();
 		const existing = this.data.conversations[key];
@@ -74,6 +86,7 @@ export class SessionRegistry {
 			sessionId,
 			createdAt: existing?.createdAt ?? now,
 			lastUsedAt: now,
+			profile,
 		};
 		delete this.data.severedAt[key];
 		this.flush();

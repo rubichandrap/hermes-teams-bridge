@@ -148,6 +148,28 @@ describe("TurnDispatcher", () => {
 		expect(runner.renames).toHaveLength(0);
 	});
 
+	it("bootstraps fresh when the registered session came from another profile", async () => {
+		registry.set("main", "conv-1", "20260811_000000_old001", "chatbot");
+
+		const result = await dispatcher.dispatch(
+			"main",
+			"conv-1",
+			teamsMessage("hello"),
+		);
+		expect(result.ok).toBe(true);
+
+		expect(runner.spawns).toHaveLength(1);
+		expect(runner.spawns[0]?.resumeSessionId).toBeUndefined();
+
+		runner.spawns[0]!.completion.sessionId = "20260811_000000_new002";
+		runner.spawns[0]!.release();
+		await new Promise((r) => setTimeout(r, 10));
+
+		const entry = registry.get("main", "conv-1");
+		expect(entry?.sessionId).toBe("20260811_000000_new002");
+		expect(entry?.profile).toBe("default");
+	});
+
 	it("serializes rapid messages: one in-flight turn, spawns run in order", async () => {
 		const first = dispatcher.dispatch("main", "conv-1", teamsMessage("first"));
 		await new Promise((r) => setTimeout(r, 10));

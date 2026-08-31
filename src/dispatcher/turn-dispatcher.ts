@@ -138,7 +138,12 @@ export class TurnDispatcher {
 			);
 			return false;
 		}
-		this.registry.set(agentId, conversationId, sessionId);
+		this.registry.set(
+			agentId,
+			conversationId,
+			sessionId,
+			this.config.agents[agentId]?.profile ?? "default",
+		);
 		this.registry.clearPendingBootstrap(agentId, conversationId);
 		const agent = this.config.agents[agentId];
 		if (agent) {
@@ -167,9 +172,10 @@ export class TurnDispatcher {
 	): Promise<{ result: DispatchResult; completion: Promise<unknown> }> {
 		const key = conversationKey(agentId, conversationId);
 		const message = `${TURN_INSTRUCTION}\n\n${rawMessage}`;
+		const agentProfile = agent.profile ?? "default";
 		const entry = this.registry.get(agentId, conversationId);
 
-		if (entry) {
+		if (entry && entry.profile === agentProfile) {
 			const result = await this.runner.spawn(this.config, agent, message, {
 				resumeSessionId: entry.sessionId,
 			});
@@ -214,7 +220,7 @@ export class TurnDispatcher {
 				c.sessionId &&
 				!this.registry.wasSeveredAfter(agentId, conversationId, spawnStartedAt)
 			) {
-				this.registry.set(agentId, conversationId, c.sessionId);
+				this.registry.set(agentId, conversationId, c.sessionId, agentProfile);
 				this.registry.clearPendingBootstrap(agentId, conversationId);
 				this.runner.rename(
 					this.config,

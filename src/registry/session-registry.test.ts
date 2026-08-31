@@ -49,6 +49,16 @@ describe("SessionRegistry", () => {
 		);
 	});
 
+	it("persists the owning profile on entries", async () => {
+		const registry = makeRegistry();
+		registry.set("main", "conv-1", "session-a", "chatbot");
+		await registry.flushAndWait();
+
+		const reloaded = new SessionRegistry(filePath);
+		reloaded.load();
+		expect(reloaded.get("main", "conv-1")?.profile).toBe("chatbot");
+	});
+
 	it("keys entries per agent", async () => {
 		const registry = makeRegistry();
 		registry.set("main", "conv-1", "session-a");
@@ -64,11 +74,12 @@ describe("SessionRegistry", () => {
 		registry.set("main", "conv-1", "session-a");
 		const first = registry.get("main", "conv-1");
 		await new Promise((r) => setTimeout(r, 5));
-		registry.set("main", "conv-1", "session-b");
+		registry.set("main", "conv-1", "session-b", "chatbot");
 		const second = registry.get("main", "conv-1");
 		expect(second?.createdAt).toBe(first?.createdAt);
 		expect(second?.lastUsedAt).toBeGreaterThanOrEqual(first?.lastUsedAt ?? 0);
 		expect(second?.sessionId).toBe("session-b");
+		expect(second?.profile).toBe("chatbot");
 	});
 
 	it("remove severs the entry and reports whether it existed", async () => {
@@ -153,6 +164,20 @@ describe("SessionRegistry", () => {
 		expect(
 			reloaded.wasSeveredAfter("main", "fresh-sever", Date.now() - 1000),
 		).toBe(true);
+	});
+
+	it("normalizes legacy entries without a profile to default", async () => {
+		const registry = makeRegistry();
+		registry.set("main", "conv-1", "session-a", "chatbot");
+		await registry.flushAndWait();
+
+		const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+		delete data.conversations["main::conv-1"].profile;
+		fs.writeFileSync(filePath, JSON.stringify(data));
+
+		const reloaded = new SessionRegistry(filePath);
+		reloaded.load();
+		expect(reloaded.get("main", "conv-1")?.profile).toBe("default");
 	});
 
 	it("tolerates a corrupt registry file", () => {
