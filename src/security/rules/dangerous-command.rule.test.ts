@@ -73,6 +73,11 @@ describe("DangerousCommandRule", () => {
 			"please list the files in this directory",
 			"can you help me write a function",
 			"explain how promises work in javascript",
+			"total PR dalam Rupiah",
+			"Rupiah format",
+			"Delete PO button",
+			"Remove button in the toolbar",
+			"format laporan bulanan",
 		];
 
 		for (const input of negatives) {
