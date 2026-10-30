@@ -76,7 +76,7 @@ A configured identity (Hermes profile, signature, Flow 2 URL) that conversations
 _Avoid_: bot, persona
 
 **Agent turn**:
-The `hermes chat -q -Q --source teams-bridge` subprocess that runs one turn — bootstrapping a fresh session on first contact or resuming the conversation's session on later ones.
+The `hermes chat -q -Q --source tool` subprocess that runs one turn — bootstrapping a fresh session on first contact or resuming the conversation's session on later ones.
 _Avoid_: spawn, child process
 
 **Message text**:

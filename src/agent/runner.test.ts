@@ -65,7 +65,7 @@ describe("spawnAgentTurn", () => {
 		return bin;
 	}
 
-	it("spawns hermes chat with the message and teams-bridge source", async () => {
+	it("spawns hermes chat with the message and gateway-accepted tool source", async () => {
 		const out = path.join(tmpDir, "out.txt");
 		const bin = fakeBin(`printf "%s\\n" "$@" > "${out}"`);
 
@@ -82,7 +82,7 @@ describe("spawnAgentTurn", () => {
 		expect(args[2]).toBe("hello from teams");
 		expect(args).toContain("-Q");
 		expect(args).toContain("--source");
-		expect(args).toContain("teams-bridge");
+		expect(args).toContain("tool");
 		expect(args).not.toContain("-r");
 	});
 

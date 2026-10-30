@@ -4,7 +4,7 @@ import path from "node:path";
 import type { AgentConfig, BridgeConfig } from "../types";
 import { debug, error, warn } from "../utils/logger";
 
-export const AGENT_SOURCE = "teams-bridge";
+export const AGENT_SOURCE = "tool";
 
 export interface TurnCompletion {
 	sessionId?: string;
