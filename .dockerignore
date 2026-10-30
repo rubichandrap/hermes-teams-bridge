@@ -1,0 +1,15 @@
+.git
+.gitignore
+node_modules
+dist
+coverage
+*.log
+.env
+.env.*
+!.env.example
+state.json
+state.json.*
+failed.json
+registry.json
+docs
+.scratch

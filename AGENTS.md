@@ -22,6 +22,7 @@ Before considering any change done, all must pass:
 - `npm run lint`
 - `npm run test` (write or update tests first if behavior changed)
 - `npm run build` for any change to `src/`
+- `docker compose config && docker compose build` for any change to Docker files
 
 ## Build & Verify
 ```bash
@@ -32,6 +33,7 @@ npm run lint:fix    # biome check --write src/
 npm run test        # vitest run
 npm run test:watch  # vitest (watch mode)
 npm run test:cov    # vitest run --coverage
+docker compose build # build the deployment image
 ```
 
 ## Architecture
@@ -55,8 +57,9 @@ src/index.ts                    Bootstrap
 - **Zero runtime dependencies** — Node.js built-ins only (`fs`, `path`, `http`, `sqlite`)
 - **Strict TS** — `noUnusedLocals`, `noUnusedParameters`, `noUncheckedIndexedAccess`
 - **Formatter:** biome (tabs, 120 cols)
-- **Config load order:** `programmatic defaults → config.json → .env`
+- **Config load order:** `programmatic defaults → config.json → process env → .env`
 - **Requires Node >= 22.13** (for `node:sqlite` with read-only connections)
+- **Deployment:** Docker Compose — the image pins `nousresearch/hermes-agent:v0.22.5` (bundled Hermes CLI + Node), mounts the host `$HERMES_HOME` at `/opt/data`, and runs the bridge as the host UID/GID. Host networking keeps the proxy on `127.0.0.1:18790`.
 
 ## Hermes Integration Points (what changed vs the OpenClaw bridge)
 
@@ -78,6 +81,10 @@ src/index.ts                    Bootstrap
 | File | Role |
 |------|------|
 | `src/index.ts` | Entry point — bootstrap only |
+| `Dockerfile` | Multi-stage build (Node 22 build → pinned Hermes runtime image) |
+| `docker-compose.yml` | Compose service: host UID/GID, host networking, `$HERMES_HOME` volume |
+| `docker/entrypoint.sh` | Seeds `config.json` into `/opt/data/teams-bridge` and drops to the host UID/GID |
+| `.dockerignore` | Keeps secrets, build output, and runtime state out of the image |
 | `src/core/bridge.ts` | Orchestrator: db watcher, heartbeat, proxy, signal handlers |
 | `src/core/session-lifecycle.ts` | Core logic: parse sessions, run security, forward responses, retry |
 | `src/store/hermes-store.ts` | Read-only SQLite adapter: row → `SessionEntry` mapping, `[TEAMS_META]` discovery |
@@ -97,10 +104,10 @@ src/index.ts                    Bootstrap
 ## Config
 
 - `config.json` — behavioral tuning (non-sensitive): `proxyMode`, `proxyPort`, `responseTimeoutSeconds`, `responseSettleMs`, `sessionPollMs`, `hermesBin`, `resetCommands` (default `["/reset"]`), per-agent `signature`/`profile`/`extraArgs`
-- `.env` — secrets + deployment (`TEAMS_BRIDGE_*` prefix, e.g. `TEAMS_BRIDGE_FLOW2_URL_MAIN`), copy from `.env.example`
-- `state.json` — runtime state: `forwarded`, `retries` (max 3), `failed` (audit log, mirrored in `failed.json`)
-- `dbPath` resolves to `$HERMES_HOME/state.db` (default `~/.hermes/state.db`); override with `TEAMS_BRIDGE_DB_PATH`
-- Per-agent `profile` selects the Hermes profile: the runner sets `HERMES_HOME=~/.hermes/profiles/<profile>` for non-`default` profiles; sessions without a profile name map to the agent whose `profile` is `default`
+- `.env` — secrets + deployment (`TEAMS_BRIDGE_*` prefix, e.g. `TEAMS_BRIDGE_FLOW2_URL_MAIN`), copy from `.env.example`; Docker Compose loads it via `env_file` and also uses `HERMES_HOST_HOME`/`HERMES_UID`/`HERMES_GID` for the volume and runtime user
+- `state.json` — runtime state: `forwarded`, `retries` (max 3), `failed` (audit log, mirrored in `failed.json`); under Docker these live in `$HERMES_HOME/teams-bridge/`
+- `dbPath` resolves to `$HERMES_HOME/state.db` (host `~/.hermes/state.db`, container `/opt/data/state.db`); override with `TEAMS_BRIDGE_DB_PATH`
+- Per-agent `profile` selects the Hermes profile: the runner sets `HERMES_HOME=~/.hermes/profiles/<profile>` for non-`default` profiles (container: `/opt/data/profiles/<profile>`); sessions without a profile name map to the agent whose `profile` is `default`
 
 ## Conventions
 

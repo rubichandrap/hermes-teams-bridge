@@ -45,36 +45,52 @@ Teams ──Power Automate──▶ Proxy (127.0.0.1:18790/teams-proxy)
 
 ## Requirements
 
-- Node.js >= 22.13 (for `node:sqlite` read-only connections)
-- [Hermes Agent](https://hermes-agent.nousresearch.com/) installed and usable (`hermes chat -q "ping"` works)
+- Docker Engine with Compose v2 (Linux; the proxy uses host networking)
+- A Hermes data directory (`$HERMES_HOME`, default `~/.hermes`) containing `state.db`, `config.yaml`, and `auth.json` — the container mounts it at `/opt/data`
 - A Power Automate Flow 2 trigger URL that posts to your Teams channel
 - (Optional) Hermes profiles for multi-agent setups: `hermes profile create <name>`
+
+The Docker image bundles the Hermes CLI (pinned to `nousresearch/hermes-agent:v0.22.5`) and Node.js, so neither has to be installed on the host. Running natively instead requires Node.js >= 22.13 and a working `hermes` binary.
 
 ## Setup
 
 ```bash
 cd ~/projects/github.com/rubichandrap/hermes-teams-bridge
-npm install
-npm run build
 cp .env.example .env
 ```
 
-Fill `.env` — at minimum the per-agent Flow 2 URL:
+Fill `.env` — at minimum the per-agent Flow 2 URL, the host Hermes directory, and the host UID/GID:
 
 ```
 TEAMS_BRIDGE_FLOW2_URL_MAIN=https://prod-xx.centralindia.logic.azure.com/workflows/.../triggers/manual/paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=YOUR_SIG
 TEAMS_BRIDGE_PROXY_MODE=true
+TEAMS_BRIDGE_PROXY_TOKEN=<random token, also configured in Flow 1>
+
+HERMES_HOST_HOME=/home/user/.hermes
+HERMES_UID=1000   # id -u
+HERMES_GID=1000   # id -g
 ```
 
-Tune behavior in `config.json` (proxy port, settle window, response timeout, reset command, agents).
+Tune behavior in `config.json` (proxy port, settle window, response timeout, reset command, agents). The file is mounted read-only into the image; restart the container after editing it.
 
 ### Run
 
 ```bash
+docker compose up -d --build       # build + start in the background
+docker compose logs -f bridge      # follow logs
+docker compose restart bridge      # reload config.json
+docker compose down                # stop (host data is preserved)
+```
+
+The container runs as `HERMES_UID:HERMES_GID` and writes bridge state to `$HERMES_HOST_HOME/teams-bridge/` (`state.json`, `failed.json`, `registry.json`). It uses host networking because the proxy binds `127.0.0.1:18790`; point your tunnel at that address exactly as before.
+
+Native development is still available:
+
+```bash
+npm install
+npm run build
 npm start                    # node dist/index.js
-npm run dev                  # tsx watch (development)
-npm run start:pm2            # pm2 start ecosystem.config.js
-npm run logs                 # pm2 logs hermes-teams-bridge
+npm run dev                  # tsx watch
 ```
 
 ## Power Automate Wiring
@@ -100,7 +116,7 @@ npm run logs                 # pm2 logs hermes-teams-bridge
   ```
   The Flow posts the message back to the conversation.
 
-> The bridge and Hermes must run on a machine reachable from Power Automate. For a home network, expose the proxy port via a tunnel (ngrok/cloudflared) and update Flow 1's URL accordingly — and put an authenticator in front of it.
+> The bridge and Hermes must run on a machine reachable from Power Automate. The Docker service uses host networking and the proxy listens on `127.0.0.1:18790` inside the host namespace; expose it via a tunnel (ngrok/cloudflared/devtunnel) and put the bearer token in front of it.
 
 ## Agent Autonomy (headless tool approval)
 
@@ -117,15 +133,16 @@ npm run logs                 # pm2 logs hermes-teams-bridge
 }
 ```
 
-Alternatively configure the profile's approval mode in `~/.hermes/config.yaml` (see Hermes docs on approval modes). Without this, the agent answers from knowledge/tools that need no approval, and prompts that require tool approval may stall until the response timeout.
+Alternatively configure the profile's approval mode in the Hermes config (`~/.hermes/config.yaml` on the host, mounted at `/opt/data/config.yaml` in the container; see Hermes docs on approval modes). Without this, the agent answers from knowledge/tools that need no approval, and prompts that require tool approval may stall until the response timeout.
 
 ## Testing & Validation
 
 ```bash
 npm run typecheck   # strict TS, build + tests
 npm run lint        # biome
-npm run test        # vitest — 270 tests (14 files)
+npm run test        # vitest — 279 tests (15 files)
 npm run build
+docker compose build
 ```
 
 Tests cover the full lifecycle with a `FileBackedStore` fixture (injected via the `SessionStore` interface), the SQLite adapter against a real temp database, the runner's spawn/env/args contract, and all ported parser/forwarder/state/security suites.
@@ -142,14 +159,18 @@ Tests cover the full lifecycle with a `FileBackedStore` fixture (injected via th
 | Config | `forwardTo`/`hookToken`/`minAgeSeconds`/`sessionsDir` dropped; `hermesBin`/`dbPath`/`sessionPollMs`/`profile`/`extraArgs` added; `resetCommands` added with the resume model |
 | Engine | Node >= 22.13 (was >= 18) — required for `node:sqlite` |
 
-Kept identical: settle window, pending-session timeout fallback, retry scheduler + backoff, circuit breaker, dual-key dedup, state/failed persistence, security rules, PM2 ecosystem, strict-TS/biome conventions.
+Kept identical: settle window, pending-session timeout fallback, retry scheduler + backoff, circuit breaker, dual-key dedup, state/failed persistence, security rules, strict-TS/biome conventions. Deployment moved from PM2 to Docker Compose.
 
 ## Troubleshooting
 
+- **Container restart-loops** — `docker compose logs bridge`; the loader exits(1) on a missing/invalid `TEAMS_BRIDGE_FLOW2_URL_MAIN`. Confirm `.env` exists and `HERMES_HOST_HOME` points at the directory containing `state.db`.
+- **`EACCES` on `state.db` or `teams-bridge/`** — set `HERMES_UID`/`HERMES_GID` in `.env` to the owner of the host Hermes directory (`stat -c '%u %g' ~/.hermes`).
+- **`bind: address already in use` on 18790** — a native or PM2 bridge is still running; stop it (`pkill -f 'dist/index.js'`) or change `TEAMS_BRIDGE_PROXY_PORT` in `.env` and `config.json`.
 - **"Agent main: missing flow2Url"** — set `TEAMS_BRIDGE_FLOW2_URL_MAIN` (or a top-level `flow2Url`) in `.env`; the loader exits(1) on missing config.
 - **Bridge won't start: SQLite error** — confirm `dbPath` points at a real Hermes `state.db` (`hermes doctor` validates the install). The store opens read-only; if Hermes is mid-VACUUM, the 3s busy timeout handles it.
-- **Responses never forwarded** — check the message carried a full `[TEAMS_META]` block (bare mentions are ignored by design), the session has an assistant message with `finish_reason != "tool_calls"`, and `state.json` isn't marking it `failed`.
+- **Responses never forwarded** — check the message carried a full `[TEAMS_META]` block (bare mentions are ignored by design), the session has an assistant message with `finish_reason != "tool_calls"`, and `~/.hermes/teams-bridge/state.json` isn't marking it `failed`.
 - **Agent turn stalls** — headless approval (see above); watch `LOG_LEVEL=DEBUG` logs for the spawned command and `~/.hermes/logs/` for the agent side.
+- **Flow 1 gets 401** — copy the `TEAMS_BRIDGE_PROXY_TOKEN` from `.env` into the Flow's `Authorization: Bearer <token>` header.
 
 ## License
 
