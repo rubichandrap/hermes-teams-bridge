@@ -319,7 +319,7 @@ describe("postToFlow2", () => {
 		expect(result.httpCode).toBe(200);
 	});
 
-	it("treats a 202 Power Automate waiting-run error as server-busy", async () => {
+	it("treats a 202 Power Automate waiting-run error as permanent without retry", async () => {
 		mockHttpsResponse(
 			202,
 			JSON.stringify({
@@ -341,7 +341,7 @@ describe("postToFlow2", () => {
 		);
 		expect(result.forwarded).toBe(false);
 		expect(result.httpCode).toBe(202);
-		expect(result.category).toBe("server-busy");
+		expect(result.category).toBe("permanent");
 		expect(result.error).toContain("WorkflowMaximumWaitingRunCountExceeded");
 	});
 

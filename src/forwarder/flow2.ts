@@ -139,12 +139,17 @@ export async function postToFlow2(
 		if (response.statusCode >= 200 && response.statusCode < 300) {
 			const paError = powerAutomateError(response.body);
 			if (paError) {
-				recordBreakerFailure(breaker, "server-busy");
+				const category: ErrorCategory = paError.includes(
+					"WorkflowMaximumWaitingRunCountExceeded",
+				)
+					? "permanent"
+					: "server-busy";
+				recordBreakerFailure(breaker, category);
 				return {
 					forwarded: false,
 					httpCode: response.statusCode,
 					error: `Power Automate: ${paError}`,
-					category: "server-busy",
+					category,
 				};
 			}
 			breaker.status = "closed";
