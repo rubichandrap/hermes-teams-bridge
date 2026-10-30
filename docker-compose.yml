@@ -16,8 +16,8 @@ services:
       TEAMS_BRIDGE_STATE_DIR: /opt/data/teams-bridge
       TEAMS_BRIDGE_DB_PATH: /opt/data/state.db
       TEAMS_BRIDGE_PROXY_PORT: ${TEAMS_BRIDGE_PROXY_PORT:-18790}
-      HERMES_UID: ${HERMES_UID:-1000}
-      HERMES_GID: ${HERMES_GID:-1000}
+      HERMES_UID: ${HERMES_UID:-}
+      HERMES_GID: ${HERMES_GID:-}
     volumes:
       - "${HERMES_HOST_HOME:?set HERMES_HOST_HOME in .env}:/opt/data"
       - ./config.json:/app/config.json:ro
