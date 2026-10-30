@@ -137,6 +137,16 @@ export async function postToFlow2(
 	try {
 		const response = await sendHttpsRequest(flow2Url, JSON.stringify(payload));
 		if (response.statusCode >= 200 && response.statusCode < 300) {
+			const paError = powerAutomateError(response.body);
+			if (paError) {
+				recordBreakerFailure(breaker, "server-busy");
+				return {
+					forwarded: false,
+					httpCode: response.statusCode,
+					error: `Power Automate: ${paError}`,
+					category: "server-busy",
+				};
+			}
 			breaker.status = "closed";
 			breaker.streak = 0;
 			breaker.probeInFlight = false;
@@ -171,6 +181,21 @@ export async function postToFlow2(
 interface HttpResponse {
 	statusCode: number;
 	body: string;
+}
+
+function powerAutomateError(body: string): string | null {
+	try {
+		const data = JSON.parse(body) as {
+			properties?: { error?: { code?: unknown; message?: unknown } };
+		};
+		const err = data.properties?.error;
+		if (!err || typeof err.code !== "string" || !err.code) return null;
+		return typeof err.message === "string" && err.message
+			? `${err.code}: ${err.message}`
+			: err.code;
+	} catch {
+		return null;
+	}
 }
 
 function sendHttpsRequest(url: string, body: string): Promise<HttpResponse> {

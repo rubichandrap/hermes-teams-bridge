@@ -319,6 +319,32 @@ describe("postToFlow2", () => {
 		expect(result.httpCode).toBe(200);
 	});
 
+	it("treats a 202 Power Automate waiting-run error as server-busy", async () => {
+		mockHttpsResponse(
+			202,
+			JSON.stringify({
+				properties: {
+					status: "Waiting",
+					error: {
+						code: "WorkflowMaximumWaitingRunCountExceeded",
+						message: "Disable concurrency control to resolve this.",
+					},
+				},
+			}),
+		);
+		const result = await postToFlow2(
+			"text",
+			metadata,
+			"orig",
+			"https://example.com/api",
+			"[sig]",
+		);
+		expect(result.forwarded).toBe(false);
+		expect(result.httpCode).toBe(202);
+		expect(result.category).toBe("server-busy");
+		expect(result.error).toContain("WorkflowMaximumWaitingRunCountExceeded");
+	});
+
 	it("returns server-busy on 502 with NoResponse", async () => {
 		mockHttpsResponse(502, '{"error":{"code":"NoResponse"}}');
 		const result = await postToFlow2(
