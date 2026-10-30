@@ -21,7 +21,7 @@ A port of [openclaw-teams-bridge](https://github.com/rubichandrap/openclaw-teams
 Teams ──Power Automate──▶ Proxy (127.0.0.1:18790/teams-proxy)
                              │  📋 per-turn instruction + message
                              ▼
-                     hermes chat -q <message> -Q --source teams-bridge
+                     hermes chat -q <message> -Q --source tool
                              │  (detached subprocess, profile via HERMES_HOME)
                              ▼
                      Hermes session store (~/.hermes/state.db)
@@ -36,7 +36,7 @@ Teams ──Power Automate──▶ Proxy (127.0.0.1:18790/teams-proxy)
 ### Inbound (Teams → agent)
 1. Power Automate POSTs the Teams message (with `agentId`) to the proxy.
 2. The proxy extracts `[TEAMS_META]` (conversationId, teamsMessageId, sender, reply refs) and dispatches the message to the conversation's turn queue.
-3. The dispatcher prepends the 📋 per-turn instruction and spawns `hermes chat -q -Q --source teams-bridge` — bootstrapping a fresh session on first contact or resuming the conversation's recorded session (`-r <sessionId>`). The child is detached and unref'd — it survives a bridge restart.
+3. The dispatcher prepends the 📋 per-turn instruction and spawns `hermes chat -q -Q --source tool` — bootstrapping a fresh session on first contact or resuming the conversation's recorded session (`-r <sessionId>`). The child is detached and unref'd — it survives a bridge restart.
 
 ### Outbound (agent → Teams)
 1. The db-watcher polls `state.db` every `sessionPollMs` for sessions whose user messages carry `[TEAMS_META]`; the 15s heartbeat re-scans a `lookbackMinutes` window to catch stragglers.
@@ -46,7 +46,7 @@ Teams ──Power Automate──▶ Proxy (127.0.0.1:18790/teams-proxy)
 ## Requirements
 
 - Docker Engine with Compose v2 (Linux; the proxy uses host networking)
-- A Hermes data directory (`$HERMES_HOME`, default `~/.hermes`) containing `state.db`, `config.yaml`, and `auth.json` — the container mounts it at `/opt/data`
+- A Hermes data directory (`$HERMES_HOME`, default `~/.hermes`) containing `state.db`, `config.yaml`, and `auth.json` — the container mounts it at the **same absolute path** (`HERMES_CONTAINER_HOME`)
 - A Power Automate Flow 2 trigger URL that posts to your Teams channel
 - (Optional) Hermes profiles for multi-agent setups: `hermes profile create <name>`
 
@@ -67,9 +67,12 @@ TEAMS_BRIDGE_PROXY_MODE=true
 TEAMS_BRIDGE_PROXY_TOKEN=<random token, also configured in Flow 1>
 
 HERMES_HOST_HOME=/home/user/.hermes
+HERMES_CONTAINER_HOME=/home/user/.hermes   # must equal HERMES_HOST_HOME
 HERMES_UID=1000   # id -u
 HERMES_GID=1000   # id -g
 ```
+
+`HERMES_CONTAINER_HOME` must be the same absolute path as on the host. The Hermes CLI identifies the running host gateway by its profile home; a different mount path fails with `Gateway inaccessible: profile_mismatch`.
 
 Tune behavior in `config.json` (proxy port, settle window, response timeout, reset command, agents). The file is mounted read-only into the image; restart the container after editing it.
 
@@ -154,7 +157,7 @@ Tests cover the full lifecycle with a `FileBackedStore` fixture (injected via th
 | Session source | OpenClaw agent session files → `~/.hermes/state.db` (`messages`/`sessions` tables) |
 | Watcher | `fs.watch` → SQLite polling (`node:sqlite`, read-only, WAL-safe) |
 | Tool-call detection | content parts `{type:"toolCall"}` → `tool_calls` column / `finish_reason="tool_calls"` |
-| Inbound path | OpenClaw webhook (port 18789) → `hermes chat -q -Q --source teams-bridge` subprocess |
+| Inbound path | OpenClaw webhook (port 18789) → `hermes chat -q -Q --source tool` subprocess |
 | Agent identity | OpenClaw agent dir → Hermes profile (`profile` per agent; `HERMES_HOME` env for non-default) |
 | Config | `forwardTo`/`hookToken`/`minAgeSeconds`/`sessionsDir` dropped; `hermesBin`/`dbPath`/`sessionPollMs`/`profile`/`extraArgs` added; `resetCommands` added with the resume model |
 | Engine | Node >= 22.13 (was >= 18) — required for `node:sqlite` |

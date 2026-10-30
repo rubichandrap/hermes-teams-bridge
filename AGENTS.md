@@ -48,7 +48,7 @@ src/index.ts                    Bootstrap
             ├─ src/state/manager.ts       Dedup, retry (3 max), failed tracking
             └─ src/security/index.ts      Strategy-pattern security scanner
        ├─ src/watcher/db-watcher.ts       Polls state.db for [TEAMS_META] session activity
-       ├─ src/agent/runner.ts             Spawns `hermes chat -q -Q --source teams-bridge` (bootstrap/resume by session id)
+       ├─ src/agent/runner.ts             Spawns `hermes chat -q -Q --source tool` (bootstrap/resume by session id)
        ├─ src/dispatcher/turn-dispatcher.ts  Per-conversation turn queue: bootstrap/resume, session registry, /reset
        ├─ src/registry/session-registry.ts   Persistent conversation→session mapping (registry.json)
        └─ src/proxy/server.ts            HTTP proxy (port 18790) — dispatches inbound Teams messages to the turn dispatcher
@@ -59,7 +59,7 @@ src/index.ts                    Bootstrap
 - **Formatter:** biome (tabs, 120 cols)
 - **Config load order:** `programmatic defaults → config.json → process env → .env`
 - **Requires Node >= 22.13** (for `node:sqlite` with read-only connections)
-- **Deployment:** Docker Compose — the image pins `nousresearch/hermes-agent:v0.22.5` (bundled Hermes CLI + Node), mounts the host `$HERMES_HOME` at `/opt/data`, and runs the bridge as the host UID/GID. Host networking keeps the proxy on `127.0.0.1:18790`.
+- **Deployment:** Docker Compose — the image pins `nousresearch/hermes-agent:v0.22.5` (bundled Hermes CLI + Node), mounts the host `$HERMES_HOME` at the **same absolute path** inside the container (`HERMES_CONTAINER_HOME`), and runs the bridge as the host UID/GID. The path must match so the CLI can attach to the host gateway. Host networking keeps the proxy on `127.0.0.1:18790`.
 
 ## Hermes Integration Points (what changed vs the OpenClaw bridge)
 
@@ -68,12 +68,12 @@ src/index.ts                    Bootstrap
 | `fs.watch` on OpenClaw agent session files | Poll `~/.hermes/state.db` (SQLite, WAL) every `sessionPollMs` |
 | Session files parsed as JSONL | `messages` rows mapped to the same `SessionEntry` shape |
 | Tool calls = content parts `{type:"toolCall"}` | `tool_calls` column non-empty OR `finish_reason = "tool_calls"` |
-| Proxy POSTs to OpenClaw webhook (port 18789) | Proxy spawns `hermes chat -q -Q --source teams-bridge` |
+| Proxy POSTs to OpenClaw webhook (port 18789) | Proxy spawns `hermes chat -q -Q --source tool` |
 | Agent ID = OpenClaw agent | Agent ID = configured key; `profile` maps to a Hermes profile (`HERMES_HOME` per profile) |
 | `forwardTo` / `hookToken` config | Removed (no external ingress hop) |
 
 - The store is **read-only** — the bridge never writes to Hermes' DB.
-- Sessions spawned by the bridge carry `source = "teams-bridge"` (see `AGENT_SOURCE` in `src/agent/runner.ts`), but discovery is by `[TEAMS_META]` presence, not source — a manually pasted Teams message is also picked up, matching the old bridge's behavior.
+- Sessions spawned by the bridge carry `source = "tool"` (see `AGENT_SOURCE` in `src/agent/runner.ts`) because the host gateway's `session.create` only accepts its known surfaces (`cli`, `tui`, `gui`, `acp`, `tool`, `oneshot`). Discovery is by `[TEAMS_META]` presence, not source — a manually pasted Teams message is also picked up, matching the old bridge's behavior.
 - The child `hermes chat` process is detached + unref'd: it survives a bridge restart, and the lookback heartbeat forwards responses that landed while the bridge was down.
 
 ## Key Files
@@ -82,13 +82,13 @@ src/index.ts                    Bootstrap
 |------|------|
 | `src/index.ts` | Entry point — bootstrap only |
 | `Dockerfile` | Multi-stage build (Node 22 build → pinned Hermes runtime image) |
-| `docker-compose.yml` | Compose service: host UID/GID, host networking, `$HERMES_HOME` volume |
-| `docker/entrypoint.sh` | Seeds `config.json` into `/opt/data/teams-bridge` and drops to the host UID/GID |
+| `docker-compose.yml` | Compose service: host UID/GID, host networking, `$HERMES_HOME` mounted at its host path |
+| `docker/entrypoint.sh` | Seeds `config.json` into `$HERMES_HOME/teams-bridge` and drops to the host UID/GID |
 | `.dockerignore` | Keeps secrets, build output, and runtime state out of the image |
 | `src/core/bridge.ts` | Orchestrator: db watcher, heartbeat, proxy, signal handlers |
 | `src/core/session-lifecycle.ts` | Core logic: parse sessions, run security, forward responses, retry |
 | `src/store/hermes-store.ts` | Read-only SQLite adapter: row → `SessionEntry` mapping, `[TEAMS_META]` discovery |
-| `src/agent/runner.ts` | Spawns `hermes chat -q -Q --source teams-bridge` per inbound message (bootstrap, or `-r <sessionId>` resume); captures `session_id` from stderr; best-effort `hermes sessions rename` to `teams:<conversation>` |
+| `src/agent/runner.ts` | Spawns `hermes chat -q -Q --source tool` per inbound message (bootstrap, or `-r <sessionId>` resume); captures `session_id` from stderr; best-effort `hermes sessions rename` to `teams:<conversation>` |
 | `src/dispatcher/turn-dispatcher.ts` | Per-conversation turn queue (one in-flight turn per conversation); bootstraps/resumes registry sessions; /reset severs the binding; watcher-association fallback for failed id capture |
 | `src/registry/session-registry.ts` | Persistent conversation→session mapping in `registry.json` (write-through, atomic); pending-bootstrap markers + severed tombstones |
 | `src/proxy/server.ts` | HTTP proxy (port 18790) — dispatches inbound Teams messages to the turn dispatcher; optional bearer-token auth (`TEAMS_BRIDGE_PROXY_TOKEN`) |
@@ -104,10 +104,10 @@ src/index.ts                    Bootstrap
 ## Config
 
 - `config.json` — behavioral tuning (non-sensitive): `proxyMode`, `proxyPort`, `responseTimeoutSeconds`, `responseSettleMs`, `sessionPollMs`, `hermesBin`, `resetCommands` (default `["/reset"]`), per-agent `signature`/`profile`/`extraArgs`
-- `.env` — secrets + deployment (`TEAMS_BRIDGE_*` prefix, e.g. `TEAMS_BRIDGE_FLOW2_URL_MAIN`), copy from `.env.example`; Docker Compose loads it via `env_file` and also uses `HERMES_HOST_HOME`/`HERMES_UID`/`HERMES_GID` for the volume and runtime user
+- `.env` — secrets + deployment (`TEAMS_BRIDGE_*` prefix, e.g. `TEAMS_BRIDGE_FLOW2_URL_MAIN`), copy from `.env.example`; Docker Compose loads it via `env_file` and uses `HERMES_HOST_HOME`/`HERMES_CONTAINER_HOME`/`HERMES_UID`/`HERMES_GID` for the volume and runtime user
 - `state.json` — runtime state: `forwarded`, `retries` (max 3), `failed` (audit log, mirrored in `failed.json`); under Docker these live in `$HERMES_HOME/teams-bridge/`
-- `dbPath` resolves to `$HERMES_HOME/state.db` (host `~/.hermes/state.db`, container `/opt/data/state.db`); override with `TEAMS_BRIDGE_DB_PATH`
-- Per-agent `profile` selects the Hermes profile: the runner sets `HERMES_HOME=~/.hermes/profiles/<profile>` for non-`default` profiles (container: `/opt/data/profiles/<profile>`); sessions without a profile name map to the agent whose `profile` is `default`
+- `dbPath` resolves to `$HERMES_HOME/state.db` (host and container use the same path); override with `TEAMS_BRIDGE_DB_PATH`
+- Per-agent `profile` selects the Hermes profile: the runner sets `HERMES_HOME=~/.hermes/profiles/<profile>` for non-`default` profiles; sessions without a profile name map to the agent whose `profile` is `default`
 
 ## Conventions
 
