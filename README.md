@@ -143,7 +143,7 @@ Alternatively configure the profile's approval mode in the Hermes config (`~/.he
 ```bash
 npm run typecheck   # strict TS, build + tests
 npm run lint        # biome
-npm run test        # vitest — 284 tests (15 files)
+npm run test        # vitest — 285 tests (15 files)
 npm run build
 docker compose build
 ```
