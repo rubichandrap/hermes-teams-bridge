@@ -57,7 +57,9 @@ export function startProxyServer(
 				const agentId = String(payload.agentId ?? "main");
 				const agent = config.agents[agentId];
 				if (!agent) {
-					warn(`Proxy: rejected request — unknown agent "${agentId}" (agent=${agentId})`);
+					warn(
+						`Proxy: rejected request — unknown agent "${agentId}" (agent=${agentId})`,
+					);
 					res.writeHead(400, { "Content-Type": "application/json" });
 					res.end(JSON.stringify({ error: `Unknown agent: ${agentId}` }));
 					return;
@@ -73,7 +75,9 @@ export function startProxyServer(
 
 				const meta = parseTeamsMetadataFromText(message);
 				if (!meta?.conversationId) {
-					warn("Proxy: rejected request — missing conversationId in TEAMS_META");
+					warn(
+						"Proxy: rejected request — missing conversationId in TEAMS_META",
+					);
 					res.writeHead(400, { "Content-Type": "application/json" });
 					res.end(
 						JSON.stringify({

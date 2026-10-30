@@ -172,7 +172,7 @@ describe("SessionRegistry", () => {
 		await registry.flushAndWait();
 
 		const data = JSON.parse(fs.readFileSync(filePath, "utf-8"));
-		delete data.conversations["main::conv-1"].profile;
+		data.conversations["main::conv-1"].profile = undefined;
 		fs.writeFileSync(filePath, JSON.stringify(data));
 
 		const reloaded = new SessionRegistry(filePath);

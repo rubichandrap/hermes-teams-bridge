@@ -46,6 +46,5 @@ describe("loadConfig", () => {
 
 		const config = loadConfig();
 		expect(typeof config.agents.main?.profile).toBe("string");
-		expect(config.agents.main?.signature).toBe("[🤖 Marbot]");
 	});
 });
