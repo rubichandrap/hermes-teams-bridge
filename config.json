@@ -3,7 +3,7 @@
   "proxyPort": 18790,
   "signature": "[🤖 Rubot]",
   "lookbackMinutes": 10,
-  "responseTimeoutSeconds": 180,
+  "responseTimeoutSeconds": 600,
   "responseSettleMs": 5000,
   "timeoutFallbackMessage": "⏱️ AI is still processing and exceeded the {seconds} second time limit. Please resend your question...",
   "sessionPollMs": 2000,
